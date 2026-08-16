@@ -1,0 +1,47 @@
+{
+  "_comment": "Example seed for <plugin-data-dir>/brands.json. Copy it there and edit — the real file lives outside this repo, at $CLAUDE_USER_DATA/amazon-us/brands.json. Keyed by marketplace profile id. Brand IDs are the p_123 facet values from profiles/amazon-us.json and are stable and global; names are for humans only. Populated from two live scrubs on 2026-08-12 ('usb c hub', 'hard case with foam') and reflects a first pass, not a settled verdict.",
+
+  "amazon-us": {
+    "allow": {
+      "236374": { "name": "Pelican", "why": "professional protective cases, lifetime warranty off-platform" },
+      "339784": { "name": "NANUK", "why": "professional case maker, real manufacturer" },
+      "359081": { "name": "SKB", "why": "long-established case maker, mil-spec lines" },
+      "141092": { "name": "Seahorse", "why": "established protective case manufacturer" },
+      "178065": { "name": "Case Club", "why": "real US case maker with own storefront" },
+      "3271":   { "name": "Anker", "why": "major charging/hub brand, warranty and support off Amazon" },
+      "48431":  { "name": "UGREEN", "why": "large real manufacturer, own site and support" },
+      "157711": { "name": "Belkin", "why": "long-established accessory brand" },
+      "2357":   { "name": "Satechi", "why": "real brand, own storefront and warranty" },
+      "314147": { "name": "Kensington", "why": "long-established, enterprise channel" },
+      "235284": { "name": "StarTech.com", "why": "professional connectivity vendor, full datasheets" },
+      "314074": { "name": "OWC", "why": "established Mac storage/connectivity vendor" },
+      "2003":   { "name": "Plugable", "why": "real vendor, unusually good documentation and support" },
+      "6973":   { "name": "Cable Matters", "why": "real vendor with consistent spec sheets" },
+      "251729": { "name": "TRIPP LITE", "why": "established power/connectivity brand" },
+      "232887": { "name": "Targus", "why": "long-established accessory brand" },
+      "3104":   { "name": "Monoprice", "why": "own storefront, transparent specs" },
+      "30902":  { "name": "SABRENT", "why": "real brand, warranty and support channel" }
+    },
+
+    "block": {
+      "251638": { "name": "RLSOCO", "why": "no presence off Amazon" },
+      "546420": { "name": "MEIJIA", "why": "no presence off Amazon" },
+      "503943": { "name": "Koah", "why": "no presence off Amazon" },
+      "238205": { "name": "Lykus", "why": "no presence off Amazon" },
+      "312449": { "name": "Lekufee", "why": "alphabet-soup coinage, Amazon-only" },
+      "98463":  { "name": "khanka", "why": "Amazon-only generic case seller" },
+      "336604": { "name": "Regetek", "why": "Amazon-only, no manufacturer identity" }
+    },
+
+    "unrated": {
+      "641810": { "name": "CASEMATIX", "why": "Amazon-native but broad consistent catalogue — decide on inspection" },
+      "396556": { "name": "Condition 1", "why": "budget case brand, unclear whether it is a real manufacturer" },
+      "83034":  { "name": "Smatree", "why": "action-camera accessories, some real presence off-platform" },
+      "598879": { "name": "Eylar", "why": "budget Pelican-alike; sells direct, quality unverified" },
+      "362538": { "name": "Phenyx Pro", "why": "audio brand with some off-platform presence" },
+      "5606":   { "name": "ORICO", "why": "large Chinese manufacturer, real but variable" },
+      "266211": { "name": "Baseus", "why": "large real brand, quality varies sharply by line" },
+      "723044": { "name": "j5create", "why": "real brand, mixed reliability reputation" }
+    }
+  }
+}

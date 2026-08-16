@@ -35,11 +35,24 @@ specifically *what does Amazon say*.
 
 ## Skills
 
+Anonymous, cheap, stateless — start here:
+
 - **`amazon-fetch-route`** — pick the route, prove it worked. Read before the
   first fetch of a session.
-- **`amazon-listing-check`** — price, stock, rating, seller, specs for named ASINs.
-- **`amazon-delivery-check`** — the signed-in browser workflow.
 - **`amazon-shortlist`** — need → category → search → verified candidates.
+- **`amazon-listing-check`** — price, stock, rating, seller, specs for named ASINs.
+
+Signed-in browser, for facts that only a session renders:
+
+- **`amazon-delivery-check`** — Prime dates, overnight cut-offs, coupons.
+- **`amazon-search`** — filtered search with per-card real delivery, using the
+  facet grammar and tested extractors in `profiles/amazon-us.json`.
+- **`brand-scrub`** — harvests the brand facet into a durable allow/blocklist, so
+  the next search starts from a filtered field.
+
+`profiles/amazon-us.json` holds everything volatile — facet IDs, sort keys,
+selectors, trust rubric, session-dependence notes. When Amazon changes, that is
+the file that gets edited. See [`profiles/README.md`](profiles/README.md).
 
 ## The script
 

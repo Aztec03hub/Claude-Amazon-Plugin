@@ -1,0 +1,333 @@
+{
+  "id": "amazon-us",
+  "name": "Amazon (US)",
+  "host": "www.amazon.com",
+  "currency": "USD",
+  "requires_egress": "US",
+  "verified": "2026-08-13",
+  "verified_how": "Three passes. (1) Anonymous: filter tokens read off a live search page fetched through a US egress (M247 New York, confirmed via verify_egress), recomposed into one URL and re-fetched to confirm the grammar composes and sorts. (2) Signed-in 2026-08-12: same extraction run in the user's own signed-in Chrome, Prime active, delivering to the session ZIP. (3) Signed-in 2026-08-13: extraction contract pass — per-card delivery, price and ASIN selectors derived across four queries, plus the product-page contract. Passes 1 and 2 disagree, and that disagreement is the most important thing in this file — see session_dependence.",
+
+  "session_dependence": {
+    "why_it_matters": "The same URL renders a different facet rail depending on session. A profile derived only from an anonymous fetch is wrong in a way that looks complete.",
+    "signed_in_prime_only": {
+      "p_85:2470955011": "All Prime — the canonical Prime filter. ABSENT from the anonymous page entirely. It is not retired; it is gated.",
+      "p_101:19346686011": "Overnight by 11AM",
+      "Top Brands / Premium Brands": "Amazon-curated brand-quality facets, absent anonymously"
+    },
+    "anonymous_only": {
+      "p_76:1249137011": "Free Shipping by Amazon — the degraded stand-in shown when there is no Prime session"
+    },
+    "rule": "For anything touching Prime, delivery promises or brand curation, drive the real signed-in browser. Use the anonymous US fetch only for facet grammar that does not depend on membership."
+  },
+
+  "identifier": {
+    "primary": "ASIN",
+    "format": "^(B[0-9A-Z]{9}|[0-9]{9}[0-9X])$",
+    "notes": "10 chars. Modern ASINs start with B. Legacy book ASINs are the ISBN-10, which is 9 digits plus a check char that may be X.",
+    "canonical_url": "https://www.amazon.com/dp/{ASIN}",
+    "rule": "Quote the ASIN in every recommendation. It is the shortest unambiguous handle, survives title churn, and pastes straight into search."
+  },
+
+  "search": {
+    "base": "https://www.amazon.com/s",
+    "query_param": "k",
+    "filter_param": "rh",
+    "filter_syntax": "rh=key:value,key:value  (comma-separated; URL-encode , as %2C and : as %3A)",
+    "sort_param": "s",
+    "sort_values": {
+      "relevanceblender": "Featured / default",
+      "price-asc-rank": "Price: Low to High",
+      "price-desc-rank": "Price: High to Low",
+      "review-rank": "Avg. Customer Review",
+      "date-desc-rank": "Newest Arrivals",
+      "exact-aware-popularity-rank": "Best Sellers"
+    },
+    "sort_values_source": "All six read straight off the live #s-result-sort-select option list, 2026-08-13. This supersedes the earlier note that the sort control is JS-rendered and undiscoverable — it is a real <select> in the DOM, it is simply absent from a plain server-side fetch. In the real browser, re-read it rather than trusting this list.",
+    "result_count": {
+      "selector": "[data-component-type=\"s-result-info-bar\"]",
+      "shape": "\"1-16 of 31 results for \\\"usb c hub\\\"\" — the total after filters",
+      "why": "This is the machine-readable answer to \"what did the filter cost\". Read it before and after applying a stack instead of counting cards; cards are one page, this is the whole result set."
+    }
+  },
+
+  "filters": {
+    "p_85": {
+      "label": "Delivery",
+      "values": { "2470955011": "All Prime" },
+      "availability": "signed-in Prime session only"
+    },
+    "p_90": {
+      "label": "Delivery Day",
+      "values": {
+        "8308921011": "Get It by Tomorrow",
+        "8308920011": "Get It Today",
+        "210940785011": "Add to Delivery"
+      },
+      "caveat": "Computed against the session's delivery ZIP. Set the destination first or the result set is meaningless. Read the session's own ZIP (read it from #glow-ingress-line2 before trusting any promise).",
+      "absent_is_not_unsupported": "The rail only offers the values that have hits for this query and ZIP — 'Get It Today' was missing from the usb-c-hub rail on 2026-08-13. The token still composes: the same ID applied to 'paper towels' returned 9 same-day results. So construct delivery URLs from these IDs; do not gate on the facet being visible."
+    },
+    "p_101": {
+      "label": "Delivery (fastest tier)",
+      "values": { "19346686011": "fastest available tier — label is dynamic" },
+      "availability": "signed-in Prime session only",
+      "label_is_not_stable": "Same ID rendered 'Overnight by 11AM' on 2026-08-12 and 'Tomorrow by 3PM' on 2026-08-13. The label describes the cutoff currently reachable from the session's ZIP at this hour, so it moves with time of day. Cache the ID, read the label live, and never quote a cutoff from this file."
+    },
+    "p_6": {
+      "label": "Seller",
+      "values": {
+        "ATVPDKIKX0DER": "Amazon.com (first-party). The single highest-signal filter against third-party junk.",
+        "A2L77EE7U53NWQ": "Amazon Resale",
+        "A2DKF1L73WUF4Q": "Amazon Germany",
+        "A17MC6HOH9AVE6": "Adorama"
+      },
+      "caveat": "Merchant IDs beyond these are per-seller and query-specific; do not hardcode them."
+    },
+    "p_72": { "label": "Customer Review", "values": { "1248879011": "4 Stars & Up" } },
+    "p_n_condition-type": {
+      "label": "Condition",
+      "values": { "2224371011": "New", "2224373011": "Used" }
+    },
+    "p_76": {
+      "label": "Eligible for Free Shipping",
+      "values": { "1249137011": "Free Shipping by Amazon" },
+      "availability": "anonymous session only — superseded by p_85 when signed in"
+    },
+    "p_36": {
+      "label": "Price",
+      "syntax": "cents, dash-delimited; open-ended on either side",
+      "examples": { "-1500": "Up to $15", "1500-3500": "$15 to $35", "6000-": "$60 & above" },
+      "arbitrary_ranges_work": "CONFIRMED 2026-08-13. The buckets the rail offers are query-derived and change between searches ($15-$30 on one query, $15-$35 on another), but the parameter is not limited to them: p_36:2000-2500 — a range never offered — returned 488 results correctly bounded at $20.00 ascending. Compose the user's actual budget; never round it to a bucket."
+    },
+    "p_123": {
+      "label": "Brands",
+      "syntax": "numeric global brand ID, one per brand",
+      "note": "IDs are stable and global, so an allowlist built once is reusable across every future search. The values offered on any given page are only the brands present in that result set — which is exactly what makes the facet rail the right thing to scrub.",
+      "observed": {
+        "3271": "Anker", "48431": "UGREEN", "157711": "Belkin", "2357": "Satechi",
+        "314147": "Kensington", "235284": "StarTech.com", "314074": "OWC",
+        "2003": "Plugable", "6973": "Cable Matters", "251729": "TRIPP LITE",
+        "232887": "Targus", "3104": "Monoprice", "30902": "SABRENT",
+        "5606": "ORICO", "723044": "j5create", "266211": "Baseus",
+        "308445": "HP", "391242": "Lenovo", "42439": "Microsoft", "247341": "Acer",
+        "236374": "Pelican", "339784": "NANUK", "359081": "SKB", "141092": "Seahorse",
+        "178065": "Case Club", "396556": "Condition 1", "83034": "Smatree",
+        "598879": "Eylar", "251638": "RLSOCO", "546420": "MEIJIA",
+        "641810": "CASEMATIX", "503943": "Koah", "238205": "Lykus",
+        "312449": "Lekufee", "98463": "khanka", "362538": "Phenyx Pro", "336604": "Regetek"
+      }
+    },
+    "p_n_g-101014971069111": {
+      "label": "All Top Brands",
+      "values": { "119653281011": "Top Brands" },
+      "availability": "signed-in only",
+      "caveat": "Amazon-curated. A useful prior, not a verdict — curation is partly commercial placement."
+    },
+    "p_n_g-101015887018111": {
+      "label": "Premium Brands",
+      "values": { "204376014011": "Premium Brands" },
+      "availability": "signed-in only",
+      "caveat": "Same caveat as Top Brands."
+    },
+    "p_n_deal_type": {
+      "label": "Deals & Discounts",
+      "values": {
+        "23566065011": "All Discounts",
+        "23566064011": "Today's Deals",
+        "210906366011": "Coupons",
+        "210906365011": "Buy More, Save More"
+      }
+    },
+    "p_n_cpf_labels": {
+      "label": "Sustainability Features",
+      "values": {
+        "121136630011": "Any Feature",
+        "116845683011": "Safer Chemicals",
+        "116845689011": "Recycled Materials",
+        "116845688011": "Carbon Impact",
+        "116845686011": "Worker Wellbeing",
+        "116845690011": "Manufacturing Practices"
+      }
+    },
+    "p_n_g-*": {
+      "label": "Category-specific facets",
+      "note": "Dynamic per category (ports, closure, pattern, length, width…). Never hardcode; read them off the page for the category in play."
+    }
+  },
+
+  "results_page": {
+    "note": "Derived in the signed-in browser 2026-08-12 ('hard case with foam') and extended 2026-08-13 across 'usb c hub', 'paper towels' and 'waveshare raspberry pi hat' — three queries chosen to force fast-Prime, same-day and slow-overseas delivery shapes respectively.",
+    "card_selector": "[data-component-type=\"s-search-result\"][data-asin]",
+    "card_filter": "Drop cards whose data-asin is empty — Amazon emits placeholder cards with the attribute present and blank.",
+    "asin_source": "the card's data-asin attribute — reliable",
+    "sponsored_selector": ".puis-sponsored-label-text",
+    "sponsored_ratio_observed": "4 of 12 cards. Sponsored slots skew heavily to unknown brands buying placement, so exclude them before any brand analysis.",
+    "brand_per_card": {
+      "verdict": "UNRELIABLE for building a brand list, and now understood rather than merely observed.",
+      "mechanism": "Inside [data-cy=\"title-recipe\"] the <h2> holds the BRAND when a brand row is present and the TITLE when it is not. That is why a naive 'read the h2' extractor returns titles on some cards, brands on others, and — where a badge row sits in the same slot — 'Amazon's Choice: Overall Pick'.",
+      "when_it_renders": "On brand-navigational queries only. Measured 2026-08-13: 17 of 21 cards carried a brand row on 'waveshare raspberry pi hat'; 0 of 20 on 'usb c hub'. Amazon surfaces the brand when it thinks the searcher already named one.",
+      "selectors_if_you_want_it_anyway": {
+        "brand": "[data-cy=\"title-recipe\"] :scope > div h2 — null on most cards, correct when non-null",
+        "title": "[data-cy=\"title-recipe\"] a[class*=\"s-line-clamp\"] — the only anchor that always holds the title"
+      },
+      "title_trap": "Sponsored cards carry a second a.a-link-normal, the 'Leave ad feedback' link, and it can come first in document order. A bare a.a-link-normal silently titles the row 'Leave ad feedback'."
+    },
+    "brand_source_of_truth": "the p_123 facet rail — scrub brands from there, never from the cards",
+    "duplicate_asins": "The same ASIN routinely appears twice on one page, once sponsored and once organic. Dedupe before counting or ranking.",
+
+    "structural_hooks": {
+      "why": "Amazon's card CSS classes are generated and churn. The data-cy attributes and the udm-* delivery classes are semantic and have held across every query tested. Anchor on these, and treat a-* classes as the fallback inside them.",
+      "data_cy": {
+        "title-recipe": "product title",
+        "price-recipe": "the whole price cluster — current, list, and any 'Exclusive Prime price' note",
+        "reviews-block": "star rating, review count, and the 'N bought in past month' line",
+        "delivery-recipe": "the whole delivery cluster including stock-scarcity text",
+        "delivery-block": "the delivery promise proper, inside delivery-recipe"
+      }
+    },
+
+    "extraction_contract": {
+      "asin": "card.dataset.asin",
+      "title": "[data-cy=\"title-recipe\"] — innerText",
+      "price": ".a-price .a-offscreen — the visible price string, e.g. \"$21.99\"",
+      "list_price": "[data-a-strike=\"true\"] .a-offscreen — the struck-through was-price; absent when not discounted",
+      "no_price_means_no_offer": "A card with an empty [data-cy=\"price-recipe\"] has no buyable offer at all (observed on 3 of 17 cards in one filtered search). Surface these as 'no current offer' — do not silently drop them, and never treat a missing price as $0 or as cheapest.",
+      "stars": "[aria-label*=\"out of 5 stars\"] — or the .a-icon-alt text inside [data-cy=\"reviews-block\"]",
+      "prime": ".udm-delivery-block .a-icon-prime — CONFIRMED discriminating: present on every fast-delivery card, absent on both slow-shipping cards in the same result set. Prefer this over a bare .a-icon-prime anywhere in the card.",
+      "delivery_promise": ".udm-primary-delivery-message — always present when any promise exists (20/20 cards)",
+      "delivery_date_phrase": ".udm-primary-delivery-message .a-text-bold — the date or window alone, cleanly separated from the cost clause. This is the field to parse; never regex the whole sentence.",
+      "delivery_supplemental": ".udm-supplemental-primary-delivery-message — e.g. 'Arrives with upcoming delivery' (Amazon Day consolidation). Informational, not a speed signal.",
+      "stock_scarcity": "text inside [data-cy=\"delivery-recipe\"] but outside the delivery messages, e.g. 'Only 17 left in stock - order soon.'",
+      "sponsored": ".puis-sponsored-label-text",
+      "refinement_rail": "#s-refinements"
+    },
+
+    "delivery_grammar": {
+      "why": "The primary delivery message is one string carrying three separate facts — when, at what cost, and under what condition. All observed shapes, 2026-08-13, signed-in Prime, one US residential ZIP:",
+      "observed": [
+        "Tomorrow 10 AM - 3 PM FREE delivery — Prime slotted window, the fastest tier",
+        "Tomorrow, Aug 13 FREE delivery — next-day, no window promised",
+        "Fri, Aug 14 FREE delivery — dated, a few days out",
+        "Today 6 PM - 8 PM FREE delivery on orders over $25 — same-day, and free ONLY above a basket minimum",
+        "Aug 24 - Sep 1 FREE delivery — a RANGE, not a date",
+        "Aug 24 - Sep 2 $3.16 delivery — a range plus a delivery fee"
+      ],
+      "parse_as": {
+        "speed": "Read the bold phrase. 'Today' / 'Tomorrow' / a weekday+date are promises. A bare 'Mon D - Mon D' range is an estimate, typically two to three weeks out.",
+        "cost": "The remainder of the string. 'FREE delivery' is free; '$X.XX delivery' is a real shipping fee that must be added to the item price before any comparison.",
+        "conditional": "'on orders over $N' makes the free claim conditional on basket total. Same-day free delivery carried a $25 minimum on 2026-08-13. Quoting it as free without the condition is wrong for a single-item order."
+      },
+      "range_is_a_tell": "A date range with no Prime badge is the strongest per-card signal of a direct-from-overseas third-party seller. Both such cards in the reference query were unbranded 3P listings. This is a trust signal, not just a speed one.",
+      "secondary_line": "No .udm-secondary-delivery-message appeared in any observed result set — the 'Or fastest delivery ...' second line did not render for this Prime session. Read every .udm-*delivery-message node rather than assuming exactly one."
+    },
+
+    "prime_price": {
+      "marker": "the string 'Exclusive Prime price' inside [data-cy=\"price-recipe\"]",
+      "means": "The displayed price is available only to Prime members. Relevant when comparing against a non-Prime retailer — it is not the price a non-member pays."
+    }
+  },
+
+  "product_page": {
+    "note": "Contract derived on /dp/B0DXJQT19B, signed-in, 2026-08-13. Use this when the search card is not enough — seller identity, offer count and the order-by cutoff only exist here.",
+    "asin": "#ASIN input value (also input[name=\"ASIN\"]). Authoritative; do not parse the URL, which carries slugs and tracking segments.",
+    "title": "#productTitle",
+    "price": "#corePrice_feature_div .a-offscreen",
+    "list_price": ".basisPrice .a-offscreen",
+    "price_gotcha": ".priceToPay .a-offscreen exists but returned an empty string on this layout. Fall back through corePrice before trusting a blank.",
+    "delivery_primary": "#mir-layout-DELIVERY_BLOCK-slot-PRIMARY_DELIVERY_MESSAGE_LARGE — 'FREE delivery Tomorrow 10 AM - 3 PM on qualifying orders over $25. Order within 12 hrs 26 mins'",
+    "delivery_secondary": "#mir-layout-DELIVERY_BLOCK-slot-SECONDARY_DELIVERY_MESSAGE_LARGE — 'Or FREE delivery Friday, August 14'. Present when the fast option is the conditional one.",
+    "delivery_block_trap": "#deliveryBlockMessage concatenates both slots with no separator, so 'Order within 12 hrs 26 mins' runs straight into 'Or FREE delivery Friday...'. A regex terminated on '.' overruns. Use the two slot IDs; keep #deliveryBlockMessage as fallback only.",
+    "order_within": "The countdown is the actionable half — a next-day promise that expires in 12 minutes is not a next-day promise by the time the user reads your answer. Quote it with a timestamp or not at all.",
+    "conditional_free_delivery": "Observed on a $19.98 item: 'on qualifying orders over $25'. The dp page carries the same basket-minimum condition as the search card. Never render 'FREE delivery' without its condition.",
+    "availability": "#availability .a-color-success — e.g. 'In Stock'",
+    "availability_gotcha": "Reading #availability's raw textContent returns the label glued to a blob of embedded JSON config. Always select the inner status span. Same trap on #merchantInfoFeature_feature_div.",
+    "ships_from": "#fulfillerInfoFeature_feature_div .offer-display-feature-text-message — 'Amazon' when Amazon fulfils",
+    "sold_by": "#merchantInfoFeature_feature_div .offer-display-feature-text-message — e.g. 'AnkerDirect'",
+    "seller_gotcha": "#sellerProfileTriggerId is NOT the seller name — it reads 'Learn more about the seller'.",
+    "ships_from_vs_sold_by": "These differ constantly and the difference is the whole point: 'Ships from Amazon / Sold by AnkerDirect' is FBA — Amazon logistics, brand-owned listing, and a strong positive. 'Ships from and sold by Amazon.com' is first-party. Anything shipping from an unknown merchant is the risk case. A p_6:ATVPDKIKX0DER search filter answers only the first-party question; this pair answers the real one.",
+    "other_offers": "#aod-ingress-link — 'New & Used (29) from $18.99'. Gives both the competing-offer count and the lowest available price, which is often well under the buy box (observed: 4 offers from $16.98 against a $19.98 buy box). The price appears twice in the raw text, offscreen copy plus visible copy; dedupe before quoting.",
+    "rating": "#acrPopover .a-icon-alt",
+    "rating_count": "#acrCustomerReviewText",
+    "recent_sales": "#social-proofing-faceout-title-tk_bought — '10K+ bought in past month'",
+    "product_details_table": {
+      "selector": ".prodDetTable tr",
+      "lazy": "This table is NOT in the DOM on load. It renders only after scrolling roughly 60-85% down the page. Query it cold and you get nothing, which reads exactly like 'this product has no details'.",
+      "yields": "ASIN, Manufacturer, Best Sellers Rank (e.g. '#2 in USB Hubs')",
+      "date_first_available": "ABSENT on the reference listing. The trust rubric wants listing age; on many electronics listings there is no source for it on the page. Say so rather than substituting review count for age."
+    }
+  },
+
+  "recipes": {
+    "reputable_fast": {
+      "why": "A sensible default: real brands, no third-party junk, actually arrives.",
+      "url": "https://www.amazon.com/s?k={query}&rh=p_85%3A2470955011%2Cp_90%3A8308921011%2Cp_6%3AATVPDKIKX0DER%2Cp_72%3A1248879011&s=price-asc-rank",
+      "expands_to": "All Prime + Get It by Tomorrow + sold by Amazon.com + 4 stars & up, cheapest first",
+      "observed": "31 results for 'usb c hub' on 2026-08-13, all promising tomorrow, from $6.88. An earlier run of the same stack WITHOUT p_85 was recorded as collapsing to 3 — treat that number as unreproduced rather than as the expected yield. When it does over-prune, drop p_6 first: it excludes FBA listings sold by the brand's own store, which are usually the good ones."
+    },
+    "prime_signed_in": {
+      "url": "https://www.amazon.com/s?k={query}&rh=p_85%3A2470955011%2Cp_90%3A8308921011%2Cp_72%3A1248879011",
+      "requires": "signed-in Prime session"
+    },
+    "same_day": {
+      "url": "https://www.amazon.com/s?k={query}&rh=p_90%3A8308920011",
+      "observed": "9 results for 'paper towels' on 2026-08-13, all 'Today 6 PM - 8 PM'. Works for consumables at this ZIP; expect empty for most electronics.",
+      "warn": "Same-day free delivery carried an 'on orders over $25' condition. Check the basket minimum before calling it free."
+    },
+    "budget": {
+      "url": "https://www.amazon.com/s?k={query}&rh=p_36%3A{min_cents}-{max_cents}&s=price-asc-rank",
+      "note": "Arbitrary cent ranges work — use the user's real budget, not the buckets the rail offers."
+    },
+    "brand_allowlist": {
+      "url": "https://www.amazon.com/s?k={query}&rh=p_123%3A{id}%2Cp_123%3A{id2}&s=price-asc-rank",
+      "note": "Repeat p_123 per brand; Amazon ORs values within one facet. Build the id list with the brand-scrub skill."
+    }
+  },
+
+  "trust_rubric": {
+    "why": "Fakespot (dead 2025-07-01) and ReviewMeta (faded, no successor) are gone, and no API replaced them. Screening is heuristic and must be encoded here.",
+    "strong_positive": [
+      "Ships from and sold by Amazon.com (p_6:ATVPDKIKX0DER)",
+      "Brand has a real manufacturer site, warranty and support channel off Amazon",
+      "Brand appears in the p_123 facet with a stable global ID and a broad catalogue",
+      "Brand carries the category's professional reputation (protective cases: Pelican, NANUK, SKB, Seahorse)"
+    ],
+    "strong_negative": [
+      "Alphabet-soup brand name — random capitalised coinage with no presence off Amazon (observed: MOKiN, QGeeM, LISEN, ABLEWE, intpw, dockteck, WENTER, RLSOCO, MEIJIA, Lekufee, khanka, Regetek, Relaxweex)",
+      "Appears only in sponsored slots",
+      "Review count wildly out of proportion to listing age",
+      "Reviews aggregated across unrelated variants — the variant-hijack tell: read the variant selector, not the headline count",
+      "Sole seller is an unknown 3P merchant with no other catalogue"
+    ],
+    "weak_signals_do_not_over_weight": [
+      "Amazon's Choice badge — placement, not quality",
+      "Best Seller badge — category-scoped and gameable",
+      "Top Brands / Premium Brands facets — curated, but partly commercial",
+      "Star average alone, absent review-count and listing age"
+    ],
+    "note": "AI-generated reviews are grammatically clean and varied, so linguistic tells that worked pre-2025 no longer discriminate. Prefer structural signals — seller identity, brand existence off-platform, listing age — over review text."
+  },
+
+  "access": {
+    "api": "none available",
+    "paapi5": "DEAD. Returns HTTP 403 AccessDeniedException. Docs 302 to affiliate-program.amazon.com/creatorsapi/docs/en-us/paapiv5-deprecation. Replacement Creators API is gated behind an Associates account with ongoing qualified sales.",
+    "keepa": "Only working programmatic route to buy-box/seller/offer data. Paid. /product = 1 token/ASIN, +6 tokens per offer page of 10 — a seller-quality check is ~7 tokens/ASIN, not 1. Tokens expire after 60 minutes.",
+    "fetch_route": {
+      "primary": "claude-in-chrome (real session; required for Prime state, curated brand facets and logged-in delivery dates)",
+      "secondary": "geo-egress fetch_markdown with egress=us (worked unauthenticated on 2026-08-12; returns ~700KB, mine it from the saved file, never into context)",
+      "never": "any cloud fetcher without a US exit — returns ILS pricing and a dead buy box with HTTP 200 and no error"
+    },
+    "extraction_gotcha": "The Chrome extension blocks JS results that look like cookie or query-string data. Parse facet tokens into separate {facet, id} fields before returning them; returning raw href fragments or 'key=value' strings gets the whole result blocked."
+  },
+
+  "traps": [
+    "Search pages are ~700KB of markdown. Always parse from the saved tool-result file; never read one into context. In the real browser, run a JS extractor that returns only the fields in extraction_contract — never dump page text.",
+    "The sort <select> is absent from a plain server-side fetch but present in the real browser at #s-result-sort-select. All six values are now confirmed; the earlier 'undiscoverable' note was a property of the fetch route, not of the page.",
+    "Filter availability is session-dependent — see session_dependence. This is the single easiest way to derive a wrong profile.",
+    "A facet missing from the rail does not mean the token is dead — it means this query and ZIP have no hits for it. p_90 'Get It Today' was absent from one rail and worked fine when composed by hand.",
+    "Facet LABELS drift even when IDs do not. p_101's label changed between two consecutive days because it names the current cutoff. Never quote a delivery cutoff from this file.",
+    "Delivery promises and prices are computed against the session's delivery ZIP (read it from #glow-ingress-line2). A promise fetched for the wrong destination is wrong with no error.",
+    "'FREE delivery' can be conditional on a basket minimum, and a delivery fee can be embedded in the same sentence. Parse the cost clause; do not assume free.",
+    "A date RANGE is an estimate, not a promise, and usually means overseas shipping.",
+    "Product-page detail tables lazy-load on scroll. Querying cold returns nothing, which is indistinguishable from the product having no details.",
+    "Prices and delivery promises are geo-dependent and fail silently — verify_egress before quoting any number from a headless route."
+  ]
+}
