@@ -1,0 +1,126 @@
+{
+  "_comment": "Amazon regional marketplaces. This file is the domain/currency/locale layer only. The volatile per-marketplace search grammar - facet IDs, sort keys, selectors - lives in profiles/<id>.json, one file per marketplace, and exists so far only for amazon-us.",
+  "_verified": {
+    "domains_currencies": "General knowledge, not re-checked in session. Domain and currency are stable and low-risk; treat them as reliable but not as a substitute for reading the page.",
+    "facet_grammar": "amazon-us only. See profiles/amazon-us.json for what was verified and how. Every other marketplace has no facet profile at all - do not reuse the US facet IDs against another domain, they are marketplace-local.",
+    "date": "2026-08-17"
+  },
+
+  "default": "amazon-us",
+
+  "marketplaces": {
+    "amazon-us": {
+      "domain": "www.amazon.com", "country": "US", "currency": "USD",
+      "symbol": "$", "postcode_label": "ZIP", "locale": "en-US",
+      "probe_asin": "B0CHHB4RHV", "facet_profile": "profiles/amazon-us.json"
+    },
+    "amazon-uk": {
+      "domain": "www.amazon.co.uk", "country": "GB", "currency": "GBP",
+      "symbol": "£", "postcode_label": "postcode", "locale": "en-GB",
+      "probe_asin": null, "facet_profile": null
+    },
+    "amazon-de": {
+      "domain": "www.amazon.de", "country": "DE", "currency": "EUR",
+      "symbol": "€", "postcode_label": "PLZ", "locale": "de-DE",
+      "probe_asin": null, "facet_profile": null
+    },
+    "amazon-fr": {
+      "domain": "www.amazon.fr", "country": "FR", "currency": "EUR",
+      "symbol": "€", "postcode_label": "code postal", "locale": "fr-FR",
+      "probe_asin": null, "facet_profile": null
+    },
+    "amazon-it": {
+      "domain": "www.amazon.it", "country": "IT", "currency": "EUR",
+      "symbol": "€", "postcode_label": "CAP", "locale": "it-IT",
+      "probe_asin": null, "facet_profile": null
+    },
+    "amazon-es": {
+      "domain": "www.amazon.es", "country": "ES", "currency": "EUR",
+      "symbol": "€", "postcode_label": "código postal", "locale": "es-ES",
+      "probe_asin": null, "facet_profile": null
+    },
+    "amazon-nl": {
+      "domain": "www.amazon.nl", "country": "NL", "currency": "EUR",
+      "symbol": "€", "postcode_label": "postcode", "locale": "nl-NL",
+      "probe_asin": null, "facet_profile": null
+    },
+    "amazon-se": {
+      "domain": "www.amazon.se", "country": "SE", "currency": "SEK",
+      "symbol": "kr", "postcode_label": "postnummer", "locale": "sv-SE",
+      "probe_asin": null, "facet_profile": null
+    },
+    "amazon-pl": {
+      "domain": "www.amazon.pl", "country": "PL", "currency": "PLN",
+      "symbol": "zł", "postcode_label": "kod pocztowy", "locale": "pl-PL",
+      "probe_asin": null, "facet_profile": null
+    },
+    "amazon-ca": {
+      "domain": "www.amazon.ca", "country": "CA", "currency": "CAD",
+      "symbol": "$", "postcode_label": "postal code", "locale": "en-CA",
+      "probe_asin": null, "facet_profile": null
+    },
+    "amazon-mx": {
+      "domain": "www.amazon.com.mx", "country": "MX", "currency": "MXN",
+      "symbol": "$", "postcode_label": "código postal", "locale": "es-MX",
+      "probe_asin": null, "facet_profile": null
+    },
+    "amazon-br": {
+      "domain": "www.amazon.com.br", "country": "BR", "currency": "BRL",
+      "symbol": "R$", "postcode_label": "CEP", "locale": "pt-BR",
+      "probe_asin": null, "facet_profile": null
+    },
+    "amazon-au": {
+      "domain": "www.amazon.com.au", "country": "AU", "currency": "AUD",
+      "symbol": "$", "postcode_label": "postcode", "locale": "en-AU",
+      "probe_asin": null, "facet_profile": null
+    },
+    "amazon-jp": {
+      "domain": "www.amazon.co.jp", "country": "JP", "currency": "JPY",
+      "symbol": "￥", "postcode_label": "postal code", "locale": "ja-JP",
+      "probe_asin": null, "facet_profile": null
+    },
+    "amazon-in": {
+      "domain": "www.amazon.in", "country": "IN", "currency": "INR",
+      "symbol": "₹", "postcode_label": "PIN code", "locale": "en-IN",
+      "probe_asin": null, "facet_profile": null
+    },
+    "amazon-sg": {
+      "domain": "www.amazon.sg", "country": "SG", "currency": "SGD",
+      "symbol": "$", "postcode_label": "postal code", "locale": "en-SG",
+      "probe_asin": null, "facet_profile": null
+    },
+    "amazon-ae": {
+      "domain": "www.amazon.ae", "country": "AE", "currency": "AED",
+      "symbol": "AED", "postcode_label": "none", "locale": "en-AE",
+      "probe_asin": null, "facet_profile": null
+    },
+    "amazon-sa": {
+      "domain": "www.amazon.sa", "country": "SA", "currency": "SAR",
+      "symbol": "SAR", "postcode_label": "postal code", "locale": "en-SA",
+      "probe_asin": null, "facet_profile": null
+    },
+    "amazon-tr": {
+      "domain": "www.amazon.com.tr", "country": "TR", "currency": "TRY",
+      "symbol": "₺", "postcode_label": "posta kodu", "locale": "tr-TR",
+      "probe_asin": null, "facet_profile": null
+    },
+    "amazon-eg": {
+      "domain": "www.amazon.eg", "country": "EG", "currency": "EGP",
+      "symbol": "EGP", "postcode_label": "postal code", "locale": "en-EG",
+      "probe_asin": null, "facet_profile": null
+    }
+  },
+
+  "no_local_marketplace": {
+    "_comment": "Countries with no Amazon storefront of their own, served by another marketplace as an export destination. The distinction matters: the landed price is not the listed price, and the listed currency is not necessarily the marketplace's home currency.",
+    "IL": {
+      "served_by": "amazon-us",
+      "notes": [
+        "There is no amazon.co.il. Israel is served by amazon.com as an international destination.",
+        "amazon.com renders prices in ILS when the request egresses from an Israeli IP, and in USD from a US IP. Same URL, same ASIN, different number, HTTP 200 either way - so the currency in the answer is a property of the route, not of the listing. Verified via the geo-egress work; see reference/fetch-routes.md.",
+        "Landed cost adds an Import Fees Deposit plus shipping. The listed price is not the price paid.",
+        "Prime does not carry over. A US Prime membership buys nothing on an order shipped to Israel."
+      ]
+    }
+  }
+}

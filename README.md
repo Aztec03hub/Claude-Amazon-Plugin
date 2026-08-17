@@ -13,8 +13,18 @@ those, so an Amazon question gets an answer you can act on.
 
 ## Scope
 
-This is the **marketplace-specific** plugin for Amazon US. It is deliberately
-narrow, and complements rather than replaces:
+This is the **Amazon** plugin: all of Amazon's regional storefronts, not just
+amazon.com. The machinery is region-neutral and the volatile knowledge is data —
+`profiles/amazon-marketplaces.json` for domain, currency and postcode format,
+`profiles/<marketplace>.json` for the search grammar. Only `amazon-us` has a
+verified search grammar today; the rest are a derivation away, not a rewrite
+away. See [reference/marketplaces.md](reference/marketplaces.md).
+
+Nothing personal ships in the repo. Delivery addresses and per-marketplace
+preferences live in a user directory outside it, shared with `procurement-tools`
+rather than forked — see [Configuration](#configuration).
+
+It is deliberately narrow, and complements rather than replaces:
 
 - [`procurement-tools`](https://github.com/danielrosehill/Claude-Purchasing-Plugin) —
   the generalist ecommerce research plugin: intake, specs, cross-vendor
@@ -41,8 +51,11 @@ Anonymous, cheap, stateless — start here:
   first fetch of a session.
 - **`amazon-shortlist`** — need → category → search → verified candidates.
 - **`amazon-listing-check`** — price, stock, rating, seller, specs for named ASINs.
-- **`amazon-open-asin`** — open an ASIN in your own browser as a clean `/dp/` URL,
-  tracking stripped. Hands the page over; reads nothing.
+- **`amazon-marketplace-config`** — which storefront, currency, postcode and
+  egress country an answer should be built from, resolved from the stored
+  delivery address. Read before anything that quotes a price or a date.
+- **`amazon-open-asin`** — open an ASIN in your own browser as a clean `/dp/` URL
+  on the right storefront, tracking stripped. Hands the page over; reads nothing.
 
 Signed-in browser, for facts that only a session renders:
 
@@ -51,14 +64,48 @@ Signed-in browser, for facts that only a session renders:
   facet grammar and tested extractors in `profiles/amazon-us.json`.
 - **`brand-scrub`** — harvests the brand facet into a durable allow/blocklist, so
   the next search starts from a filtered field.
+- **`amazon-account-import`** — fills the address book, default ship-to and Prime
+  state into the user config from the session, so the interview covers only what
+  Amazon cannot answer.
 
 `profiles/amazon-us.json` holds everything volatile — facet IDs, sort keys,
 selectors, trust rubric, session-dependence notes. When Amazon changes, that is
 the file that gets edited. See [`profiles/README.md`](profiles/README.md).
 
+## Configuration
+
+The plugin ships **no address, no ZIP, no account state**. It reads them from a
+user directory, found by search rather than by a hardcoded path:
+
+| Order | Location |
+| --- | --- |
+| 1 | `$AMAZON_PLUGIN_CONFIG` |
+| 2 | `<user-data-root>/marketplaces/` |
+| 3 | `<user-data-root>/procurement-tools/` |
+
+`addresses.yaml` and `marketplaces.yaml` are already owned by
+[`procurement-tools`](https://github.com/danielrosehill/Claude-Purchasing-Plugin),
+and a delivery address is not Amazon-specific knowledge, so this plugin adopts
+that store instead of forking it. It never migrates one silently — two copies of
+an address is how a delivery date gets quoted for last year's flat.
+
+```bash
+python3 scripts/user_config.py path              # where the store is
+python3 scripts/user_config.py show              # what is in it, redacted
+python3 scripts/user_config.py resolve storrs    # storefront, currency, postcode, egress
+```
+
+Filling it, two halves:
+
+- **`/procurement-tools:shop-setup`** interviews the user for what no account
+  knows — deadlines, luggage limits, tax rates, where the driver actually goes.
+- **`amazon-account-import`** reads what the account does know straight out of a
+  signed-in session: the address book, the default ship-to, Prime state.
+
 ## The script
 
 `scripts/amazon_fetch.py` fetches Amazon from the local machine and prints JSON.
+`-m/--marketplace` picks the storefront on every mode.
 
 ```bash
 python3 scripts/amazon_fetch.py probe
@@ -94,8 +141,16 @@ route working, is it being walled, and which ZIP will delivery dates be for.
 - **Navigating a signed-in session can land somewhere you did not ask for.**
   Prefer read-only same-origin fetches, which cannot wander.
 
+- **An ASIN is only meaningful with its storefront.** The same ten characters can
+  be a live listing on `amazon.co.uk`, a different product on `amazon.com`, and
+  nothing on `amazon.de`. Rewriting the domain is a guess, and it returns HTTP
+  200 either way.
+- **The currency is a property of the route, not the listing.** `amazon.com`
+  renders ILS from an Israeli IP and USD from a US one, same URL, same ASIN.
+
 Full detail in [`reference/`](reference):
 [fetch-routes](reference/fetch-routes.md) ·
+[marketplaces](reference/marketplaces.md) ·
 [search-filters](reference/search-filters.md) ·
 [verification-traps](reference/verification-traps.md)
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fetch Amazon.com listings and search pages from the local machine, as JSON.
+"""Fetch Amazon listings and search pages from the local machine, as JSON.
 
 Why this exists: Claude Code's native WebFetch does not work on amazon.com. It
 returns HTTP 500 on product pages and 503 on search URLs, consistently, and not
@@ -25,6 +25,12 @@ Usage:
     amazon_fetch.py listing B0CHHB4RHV [ASIN ...] [--expect-zip 02139]
     amazon_fetch.py search "usb c power bank" [--rh p_85:2470955011]
     amazon_fetch.py probe          # is the local route working at all?
+
+    ... and -m/--marketplace on any of them to reach a storefront other than the
+    default. Storefronts are separate catalogues, so an ASIN is only meaningful
+    together with the marketplace it came from, and the --rh facet IDs are
+    marketplace-local: the US Prime node means nothing on amazon.de. Run
+    user_config.py resolve <address> to get the marketplace for a destination.
 """
 
 import argparse
@@ -33,9 +39,19 @@ import json
 import re
 import subprocess
 import sys
+from pathlib import Path
 
 UA = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) "
       "Chrome/128.0.0.0 Safari/537.36")
+
+# Set from --marketplace. Amazon runs one storefront per country and they are
+# separate catalogues: an ASIN that exists on one routinely does not exist on
+# another, and the facet grammar is marketplace-local. Nothing here should
+# assume the US.
+MARKETPLACES = json.loads(
+    (Path(__file__).resolve().parent.parent / "profiles" / "amazon-marketplaces.json")
+    .read_text())
+DOMAIN = MARKETPLACES["marketplaces"][MARKETPLACES["default"]]["domain"]
 
 # A real product page runs 400-500 KB. Anything much under that is a wall.
 MIN_REAL_PAGE = 20000
@@ -74,6 +90,26 @@ def blocked(s):
     return "captcha" in low or "not a robot" in low or len(s) < MIN_REAL_PAGE
 
 
+# `a-offscreen` is Amazon's screen-reader span and it is not price-specific -
+# "4.5 out of 5 stars" uses it too. The original regex here was `\$[\d,.]+`,
+# which was safe by accident: it only ever matched USD, so on amazon.co.uk or
+# amazon.de it returned null, and it returned null on amazon.com too whenever
+# the request egressed from Israel and the page rendered ILS. Widening it to
+# any short string fixes the currency and breaks the safety, so the symbol
+# check has to move here.
+CURRENCY = re.compile(r"[$£€₹¥￥₺₪]|R\$|\bkr\b|\bz\u0142|\b(?:AED|SAR|EGP|USD|EUR|GBP|ILS)\b")
+NOT_A_PRICE = re.compile(r"out of 5|stars?\b|%", re.I)
+
+
+def price(s):
+    """First a-offscreen span that is actually a price, in any currency."""
+    for m in re.finditer(r'class="a-offscreen">([^<]{1,24})</span>', s):
+        v = html.unescape(m.group(1)).strip()
+        if any(c.isdigit() for c in v) and CURRENCY.search(v) and not NOT_A_PRICE.search(v):
+            return v
+    return None
+
+
 def ship_to(s):
     """Which ZIP the page's delivery promise is actually for.
 
@@ -93,7 +129,7 @@ def ship_to(s):
 
 
 def listing(asin, expect_zip=None):
-    s = fetch(f"https://www.amazon.com/dp/{asin}")
+    s = fetch(f"https://{DOMAIN}/dp/{asin}")
     if blocked(s):
         return {"asin": asin, "error": "blocked or empty response",
                 "bytes": len(s),
@@ -106,7 +142,7 @@ def listing(asin, expect_zip=None):
         "title": first(s, r'id="productTitle"[^>]*>(.*?)</span>'),
         # Every price carries an a-offscreen span; the first is the buy box.
         # Grid and "similar items" prices come later in the document.
-        "price": first(s, r'class="a-offscreen">(\$[\d,.]+)</span>'),
+        "price": price(s),
         "availability": first(s, r'id="availability".*?<span[^>]*>(.*?)</span>'),
         "rating": first(s, r'id="acrPopover"[^>]*title="([^"]+)"'),
         "reviews": first(s, r'id="acrCustomerReviewText"[^>]*>(.*?)</span>'),
@@ -121,7 +157,7 @@ def listing(asin, expect_zip=None):
         "specs": {text(k).rstrip(":"): text(v) for k, v in re.findall(
             r"<tr[^>]*>\s*<th[^>]*>(.*?)</th>\s*<td[^>]*>(.*?)</td>", s, re.S)
             if SPEC_FIELDS.match(text(k))},
-        "url": f"https://www.amazon.com/dp/{asin}",
+        "url": f"https://{DOMAIN}/dp/{asin}",
     }
 
     if expect_zip:
@@ -137,7 +173,7 @@ def listing(asin, expect_zip=None):
 
 
 def search(query, rh=None):
-    url = "https://www.amazon.com/s?k=" + re.sub(r"\s+", "+", query.strip())
+    url = f"https://{DOMAIN}/s?k=" + re.sub(r"\s+", "+", query.strip())
     if rh:
         url += "&rh=" + rh.replace(":", "%3A").replace(",", "%2C")
     s = fetch(url)
@@ -159,7 +195,7 @@ def search(query, rh=None):
         results.append({
             "asin": m.group(1),
             "title": title,
-            "price": first(block, r'class="a-offscreen">(\$[\d,.]+)</span>'),
+            "price": price(block),
             "rating": first(block, r'<span[^>]*class="a-icon-alt">([\d.]+ out of 5 stars)'),
             "reviews": first(block, r'aria-label="([\d,]+) ratings?"'),
             "sponsored": "Sponsored" in block,
@@ -177,16 +213,37 @@ def search(query, rh=None):
                     "recommending anything"}
 
 
-def probe():
-    """Is the local route working, and where does Amazon think we are?"""
-    s = fetch("https://www.amazon.com/dp/B0CHHB4RHV")
+def probe(marketplace, asin=None):
+    """Is the local route working, and where does Amazon think we are?
+
+    Needs a real listing, because the ship-to line renders on product pages and
+    usually not on search pages. The known-good ASIN is per marketplace and only
+    exists for the ones that have been used: an ASIN from another storefront
+    404s, and a 404 page is small enough that blocked() calls it a bot wall.
+    That would report a working route as blocked, so ask instead of guessing.
+    """
+    m = MARKETPLACES["marketplaces"][marketplace]
+    asin = asin or m["probe_asin"]
+    if not asin:
+        return {"marketplace": marketplace, "domain": m["domain"],
+                "error": f"no known-good probe ASIN for {marketplace}",
+                "fix": f"pass one: amazon_fetch.py probe <ASIN> -m {marketplace}. "
+                       f"Any listing that is live on {m['domain']} will do. Add it to "
+                       f"profiles/amazon-marketplaces.json as probe_asin once it works."}
+    s = fetch(f"https://{m['domain']}/dp/{asin}")
     return {
         "route": "local curl",
+        "marketplace": marketplace,
+        "domain": m["domain"],
+        "probe_asin": asin,
         "bytes": len(s),
         "blocked": blocked(s),
         "ship_to": ship_to(s),
+        "price_seen": price(s),
         "verdict": ("blocked - escalate to a real browser" if blocked(s)
                     else "working"),
+        "note": ("A small page can be a 404 rather than a wall - if this ASIN is not "
+                 "live on this marketplace the verdict is wrong. Check bytes."),
     }
 
 
@@ -195,9 +252,17 @@ def main():
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("mode", choices=["listing", "search", "probe"])
     p.add_argument("args", nargs="*")
-    p.add_argument("--expect-zip", help="warn if the page resolves elsewhere")
+    p.add_argument("--expect-zip", "--expect-postcode", dest="expect_zip",
+                   help="warn if the page resolves elsewhere; ZIP in the US, "
+                        "postcode elsewhere")
+    p.add_argument("-m", "--marketplace", default=MARKETPLACES["default"],
+                   choices=sorted(MARKETPLACES["marketplaces"]),
+                   help="which Amazon storefront (default: %(default)s)")
     p.add_argument("--rh", help="Amazon filter nodes, e.g. p_85:2470955011")
     a = p.parse_args()
+
+    global DOMAIN
+    DOMAIN = MARKETPLACES["marketplaces"][a.marketplace]["domain"]
 
     if a.mode == "listing":
         if not a.args:
@@ -208,7 +273,7 @@ def main():
             sys.exit("search needs a query")
         out = search(" ".join(a.args), a.rh)
     else:
-        out = probe()
+        out = probe(a.marketplace, a.args[0] if a.args else None)
 
     print(json.dumps(out, indent=2, ensure_ascii=False))
 

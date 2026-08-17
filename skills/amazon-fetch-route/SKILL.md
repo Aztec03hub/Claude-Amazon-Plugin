@@ -19,6 +19,19 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/amazon_fetch.py" probe
 Answers all three questions at once: is the local route working, is it being
 walled, and which ZIP will delivery dates be for.
 
+## Which storefront, before which route
+
+Route selection assumes you already know *which Amazon* you are fetching. Amazon
+runs a separate storefront per country with a separate catalogue, and this
+plugin's verified knowledge — facet IDs, page sizes, the English delivery
+wording — is `amazon-us` knowledge unless it says otherwise. Resolve the
+storefront first with `amazon-marketplace-config`, and pass `-m/--marketplace` to
+`amazon_fetch.py`. See [reference/marketplaces.md](../../reference/marketplaces.md).
+
+The currency you get back is a property of the route, not of the listing:
+amazon.com renders ILS from an Israeli IP and USD from a US one, HTTP 200 both
+times. Know the egress country before quoting a price.
+
 ## Route selection
 
 | The question is | Use |

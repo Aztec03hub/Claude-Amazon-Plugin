@@ -1,7 +1,7 @@
 ---
 name: amazon-open-asin
-description: Open one or more Amazon.com ASINs in the user's own browser, as clean canonical /dp/ URLs with the tracking stripped. Use when the user says open, show me, pull up, or let me look at an Amazon product, or wants to finish a purchase decision by eye after a shortlist. This hands the page over and reads nothing — for facts about the product use amazon-listing-check instead.
-allowed-tools: Bash(xdg-open *), Bash(google-chrome *), mcp__claude-in-chrome__tabs_context_mcp, mcp__claude-in-chrome__tabs_create_mcp, Read
+description: Open one or more Amazon ASINs in the user's own browser, on the right regional storefront, as clean canonical /dp/ URLs with the tracking stripped. Use when the user says open, show me, pull up, or let me look at an Amazon product, or wants to finish a purchase decision by eye after a shortlist. This hands the page over and reads nothing — for facts about the product use amazon-listing-check instead.
+allowed-tools: Bash(xdg-open *), Bash(python3 *), Bash(*/user_config.py *), mcp__claude-in-chrome__tabs_context_mcp, mcp__claude-in-chrome__tabs_create_mcp, Read
 ---
 
 # Amazon open ASIN
@@ -9,10 +9,31 @@ allowed-tools: Bash(xdg-open *), Bash(google-chrome *), mcp__claude-in-chrome__t
 Put a product page in front of the user. No fetch, no parse, no verification —
 this skill ends when the tab is open.
 
+## Which storefront
+
+Not automatically amazon.com. Amazon runs a separate storefront per country and
+they are separate catalogues; opening the wrong one is the most likely way this
+skill wastes the user's time.
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/user_config.py" resolve
+```
+
+That returns the `domain` for the user's default delivery address; pass an
+address id to open against a different destination. Take the domain from
+whichever source is most specific:
+
+1. The user said which one — "on the UK site".
+2. The ASIN came with a URL this session — use **that** URL's domain. An ASIN is
+   only meaningful together with the storefront it was found on.
+3. The resolver's answer for the relevant address.
+4. Only if none of the above and the config is empty: amazon.com, and say that
+   you assumed it.
+
 ## The URL
 
 ```
-https://www.amazon.com/dp/<ASIN>
+https://<domain>/dp/<ASIN>
 ```
 
 That is the whole canonical form. Everything else in an Amazon URL — `ref=`,
@@ -31,7 +52,7 @@ Take the ten-character token after any of these:
 | Form | Example |
 | --- | --- |
 | `/dp/<ASIN>` | `amazon.com/dp/B0CHHB4RHV` |
-| `/gp/product/<ASIN>` | `amazon.com/gp/product/B0CHHB4RHV` |
+| `/gp/product/<ASIN>` | `amazon.co.uk/gp/product/B0CHHB4RHV` |
 | `/gp/aw/d/<ASIN>` | mobile share links |
 | `/<slug>/dp/<ASIN>` | the long shared-from-browser form |
 | `/product-reviews/<ASIN>` | a reviews link |
@@ -51,7 +72,7 @@ xdg-open "https://www.amazon.com/dp/B0CHHB4RHV" >/dev/null 2>&1
 
 The default browser here is Chrome, so this lands in the user's real signed-in
 profile — prices, Prime badges and delivery dates on the opened page are the
-user's own.
+user's own, for whichever storefront that account is signed in to.
 
 Use `tabs_create_mcp` instead when the page is going to be **worked on** and not
 just looked at: it returns a tab id the delivery and search skills can address.
@@ -66,19 +87,18 @@ window the user was using for something else.
 
 **A successful open is not evidence the ASIN exists.** `xdg-open` hands the URL
 to an already-running Chrome and exits 0 immediately; it never sees the response.
-A retired, mistyped or region-wrong ASIN opens Amazon's "Sorry, we couldn't find
-that page" dog with exactly the same exit status as a live product.
+A retired, mistyped or wrong-storefront ASIN opens Amazon's "Sorry, we couldn't
+find that page" dog with exactly the same exit status as a live product.
 
-So do not report an open as a confirmed product. Say what you opened, and if the
-ASIN has not been verified this session, say that too rather than restating the
-product name from memory.
+So do not report an open as a confirmed product. Say what you opened and on which
+storefront, and if the ASIN has not been verified this session, say that too
+rather than restating the product name from memory.
 
-The region case is the one that bites: an ASIN copied from `amazon.co.uk`,
-`amazon.de` or `amazon.ca` frequently has **no `.com` listing at all**. Same
-identifier, different catalogue. When the source URL was a non-`.com` Amazon
-domain, open the `.com` URL if that is what was asked for, but flag that the ASIN
-may not resolve there — do not silently rewrite the domain and present it as the
-same product.
+The cross-storefront case is the one that bites: an ASIN from `amazon.co.uk`
+frequently has **no listing on `amazon.com`** and vice versa. Same identifier,
+different catalogue. Never rewrite the domain to the user's home storefront and
+present the result as the same product — either open it where it was found, or
+say that the ASIN needs to be looked up again on the other storefront.
 
 ## Other views of the same ASIN
 
@@ -104,6 +124,7 @@ to get a price. For price, stock, rating, seller or specs use
 
 ## Related
 
+- `amazon-marketplace-config` — which storefront, and for which address
 - `amazon-listing-check` — the facts, without a tab
 - `amazon-delivery-check` — signed-in dates, coupons, Prime-exclusive prices
 - `amazon-shortlist` — when the argument was a need, not an ASIN

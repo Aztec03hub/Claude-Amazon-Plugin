@@ -68,7 +68,18 @@ making the date unquotable. Coupons and Prime-exclusive prices do not render
 here at all — if the total matters, say that the listing price may not be the
 checkout price and offer to check the signed-in session.
 
+## Storefront and destination
+
+Pass `-m/--marketplace` unless the user's default storefront is genuinely the
+right one, and `--expect-postcode` rather than assuming a US ZIP.
+`amazon-marketplace-config` resolves both from the stored delivery address in one
+call; it also flags the cases where the listed price is not the landed price,
+which is every destination served as an export market rather than by its own
+storefront.
+
 ## Related
+
+- `amazon-marketplace-config` — which storefront, which postcode, which egress
 
 - `amazon-fetch-route` — read first if any fetch misbehaves
 - `amazon-delivery-check` — Prime dates and coupons
