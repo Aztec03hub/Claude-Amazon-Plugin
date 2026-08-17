@@ -88,6 +88,22 @@ filter cost — the result count before and after.
 Likewise, report rows with no price as "no current offer" rather than dropping
 them. A missing price is not a cheap price.
 
+## An opened tab is not a live product
+
+`xdg-open` hands a URL to an already-running browser and exits 0 without ever
+seeing the response. A retired, mistyped or region-wrong ASIN opens Amazon's
+"Sorry, we couldn't find that page" placeholder with exactly the same exit
+status as a live listing. Opening is a handoff, not a check.
+
+The region case is the frequent one: an ASIN copied from `amazon.co.uk`,
+`amazon.de` or `amazon.ca` often has **no `.com` listing at all**. Same
+identifier, different catalogue. Rewriting the domain produces a URL that looks
+right and resolves to nothing.
+
+Also note that an ASIN is ten characters of `[A-Z0-9]` and **not necessarily
+`B0`-prefixed** — books keep their ISBN-10, including trailing-`X` forms. A
+validator that insists on `B0` rejects valid input.
+
 ## What no route can tell you
 
 - **Price history.** No free programmatic source. Keepa is the working paid one.
