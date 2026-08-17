@@ -20,7 +20,7 @@ Rules that matter here:
 - Quote `ship_to` beside any delivery date. A `ship_to_warning` means the date
   is for somewhere else; say so instead of quoting it.
 - The date returned is the **non-Prime** one. Say so, and offer
-  `/amazon-us:amazon-delivery` if arrival timing matters.
+  `/amazon:amazon-delivery` if arrival timing matters.
 - `Currently unavailable` never appears in search results, so if one of these
   came from a grid, this is the step that catches it.
 

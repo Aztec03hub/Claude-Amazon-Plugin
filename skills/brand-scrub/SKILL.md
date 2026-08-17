@@ -16,9 +16,9 @@ The output is not a report. It is a **re-runnable filtered URL** plus a durable 
 
 ## Where the list lives
 
-`<plugin-data-dir>/brands.json`, where `<plugin-data-dir>` is `$CLAUDE_USER_DATA/amazon-us/`
-if set, else `$XDG_DATA_HOME/claude-plugins/amazon-us/`, else
-`~/.local/share/claude-plugins/amazon-us/`. Create it if absent. Same convention as
+`<plugin-data-dir>/brands.json`, where `<plugin-data-dir>` is `$CLAUDE_USER_DATA/amazon/`
+if set, else `$XDG_DATA_HOME/claude-plugins/amazon/`, else
+`~/.local/share/claude-plugins/amazon/`. Create it if absent. Same convention as
 the convention the plugin ecosystem uses for per-plugin data.
 
 Shape, keyed by marketplace profile id:

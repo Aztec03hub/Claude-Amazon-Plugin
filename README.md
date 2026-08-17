@@ -1,6 +1,7 @@
-# amazon-us
+# amazon
 
-Claude Code plugin for **Amazon.com marketplace research**.
+Claude Code plugin for **Amazon marketplace research**, across Amazon's regional
+storefronts.
 
 Amazon is the case where "the fetch returned something" and "the fetch worked"
 come apart. The default fetch tool cannot reach it at all, its bot wall answers
@@ -39,9 +40,9 @@ specifically *what does Amazon say*.
 
 | Command | Does |
 | --- | --- |
-| `/amazon-us:amazon-find <need>` | Category-first research: establish what actually solves the problem, search, verify, recommend one with a trade-off |
-| `/amazon-us:amazon-check <ASIN\|URL>...` | Verified price, stock, rating, seller and specs, read off the listing |
-| `/amazon-us:amazon-delivery <ASIN>...` | Real Prime dates, coupons and Prime-exclusive pricing from your signed-in browser |
+| `/amazon:amazon-find <need>` | Category-first research: establish what actually solves the problem, search, verify, recommend one with a trade-off |
+| `/amazon:amazon-check <ASIN\|URL>...` | Verified price, stock, rating, seller and specs, read off the listing |
+| `/amazon:amazon-delivery <ASIN>...` | Real Prime dates, coupons and Prime-exclusive pricing from your signed-in browser |
 
 ## Skills
 
@@ -109,14 +110,19 @@ Filling it, two halves:
 
 ```bash
 python3 scripts/amazon_fetch.py probe
-python3 scripts/amazon_fetch.py listing B0CHHB4RHV B0XXXXXXXX --expect-zip 02139
+python3 scripts/amazon_fetch.py listing B0CHHB4RHV B0XXXXXXXX --expect-postcode 02139
 python3 scripts/amazon_fetch.py search "usb c power bank" --rh p_85:2470955011
+python3 scripts/amazon_fetch.py probe -m amazon-uk B0XXXXXXXX
 ```
 
 No dependencies beyond `curl` and Python 3.
 
 `probe` answers the three questions that matter before trusting anything: is the
-route working, is it being walled, and which ZIP will delivery dates be for.
+route working, is it being walled, and which postcode will delivery dates be for.
+
+Note that `amazon-us` throughout this repo is a **storefront** id, not the plugin
+id. The plugin is `amazon`; `amazon-us` is one of the twenty storefronts it
+speaks to, and `profiles/amazon-us.json` is that storefront's search grammar.
 
 ## What it knows that is not obvious
 
@@ -140,7 +146,6 @@ route working, is it being walled, and which ZIP will delivery dates be for.
   every slower-shipping product.
 - **Navigating a signed-in session can land somewhere you did not ask for.**
   Prefer read-only same-origin fetches, which cannot wander.
-
 - **An ASIN is only meaningful with its storefront.** The same ten characters can
   be a live listing on `amazon.co.uk`, a different product on `amazon.com`, and
   nothing on `amazon.de`. Rewriting the domain is a guess, and it returns HTTP
@@ -168,7 +173,7 @@ Full detail in [`reference/`](reference):
 
 ```
 /plugin marketplace add danielrosehill/Claude-Code-Plugins
-/plugin install amazon-us
+/plugin install amazon
 ```
 
 ## License
