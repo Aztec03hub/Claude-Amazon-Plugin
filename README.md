@@ -16,13 +16,13 @@ those, so an Amazon question gets an answer you can act on.
 This is the **marketplace-specific** plugin for Amazon US. It is deliberately
 narrow, and complements rather than replaces:
 
-- [`purchasing`](https://github.com/danielrosehill/Claude-Purchasing-Plugin) —
+- [`procurement-tools`](https://github.com/danielrosehill/Claude-Purchasing-Plugin) —
   the generalist ecommerce research plugin: intake, specs, cross-vendor
   comparison, recommendations, preference memory.
 - [`shopping`](https://github.com/danielrosehill/Claude-Shopping-Plugin) —
   region-specific consumer retail.
 
-Use `purchasing` for the buying workflow. Use this when the question is
+Use `procurement-tools` for the buying workflow. Use this when the question is
 specifically *what does Amazon say*.
 
 ## Commands
@@ -41,6 +41,8 @@ Anonymous, cheap, stateless — start here:
   first fetch of a session.
 - **`amazon-shortlist`** — need → category → search → verified candidates.
 - **`amazon-listing-check`** — price, stock, rating, seller, specs for named ASINs.
+- **`amazon-open-asin`** — open an ASIN in your own browser as a clean `/dp/` URL,
+  tracking stripped. Hands the page over; reads nothing.
 
 Signed-in browser, for facts that only a session renders:
 

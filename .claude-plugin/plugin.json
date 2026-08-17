@@ -1,6 +1,6 @@
 {
   "name": "amazon-us",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Claude Code plugin: Amazon.com marketplace research \u2014 verified price, stock, rating, seller and specs from the listing rather than the search grid; Prime-aware delivery dates checked against the ZIP they were actually rendered for; filtered signed-in search with tested extractors, a marketplace profile and a durable brand allowlist. Works around the fact that the default fetch tool cannot reach Amazon and that every fallback route fails in a way that resembles success.",
   "author": {
     "name": "Daniel Rosehill",
@@ -17,6 +17,7 @@
     "product-research",
     "shopping",
     "asin",
-    "brand-filtering"
+    "brand-filtering",
+    "open-in-browser"
   ]
 }
