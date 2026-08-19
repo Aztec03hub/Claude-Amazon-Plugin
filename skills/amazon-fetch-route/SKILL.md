@@ -68,10 +68,19 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/amazon_fetch.py" listing B0XXXXXXXX --exp
 A `ship_to_warning` in the output means the date is unusable. Say so rather than
 quoting it with a caveat.
 
-**3. A non-Prime date presented as the date.** The anonymous route returns the
-free-shipping-over-$35 promise. If the user has Prime, the real date is faster —
-by four days on one measured shortlist. Quote the anonymous date as the *worst
-case*, and go to the browser when arrival timing decides the purchase.
+**3. One delivery option presented as the delivery.** A listing offers up to two
+options that differ in cost as well as speed, and `#deliveryBlockMessage` returns
+only the first. Read `delivery_options`, which the script now returns from
+Amazon's own `data-csa-c-*` attributes: cost, date, basket minimum and cutoff as
+separate fields.
+
+Corrected 2026-08-19: this route is **not** blind to the Prime date. The Prime
+date is the second option, and it matched a signed-in session exactly on five
+Amazon-fulfilled ASINs. What the anonymous route genuinely cannot see is
+same-day/overnight availability, the lower Prime basket minimum ($25 against
+$35), the order-within cutoff, and coupons. On merchant-fulfilled items it sees
+everything the session does. See
+[reference/delivery.md](../../reference/delivery.md).
 
 ## Ask before assuming a ZIP
 

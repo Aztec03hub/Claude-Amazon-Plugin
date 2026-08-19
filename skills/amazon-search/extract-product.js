@@ -19,6 +19,71 @@
     return el ? el.textContent.trim().replace(/\s+/g, ' ') : null;
   };
 
+  /* Getting the price you would actually pay is fiddlier than it looks, in two
+     separate ways:
+
+       1. The struck-through List Price sits in the same block and on some
+          listings comes first. Read the first .a-offscreen and you get it:
+          measured 2026-08-19, ASIN 0140449132 read $16.00 against a real $12.91.
+       2. In the LIVE DOM the .priceToPay screen-reader span is blank — the price
+          is assembled from .a-price-symbol / -whole / -fraction. (In the raw
+          HTML that same span does carry the value, which is why the Python
+          extractor can regex a-offscreen and this one cannot.)
+
+     So: read .priceToPay's text, and only fall back to a non-struck offscreen
+     span. #corePrice_feature_div is additionally EMPTY on books, hence the
+     ordering of the containers below. */
+  const priceIn = () => {
+    const boxes = ['#corePriceDisplay_desktop_feature_div', '#corePrice_feature_div', '#apex_desktop'];
+    for (const sel of boxes) {
+      const box = document.querySelector(sel);
+      if (!box) continue;
+      const pay = box.querySelector('.priceToPay');
+      if (pay) {
+        const v = pay.textContent.replace(/\s+/g, '');
+        if (/\d/.test(v)) return v;
+      }
+      for (const el of box.querySelectorAll('.a-offscreen')) {
+        if (el.closest('.a-text-price, .basisPrice, [data-a-strike="true"]')) continue;
+        const v = el.textContent.trim();
+        if (/\d/.test(v)) return v;
+      }
+    }
+    return null;
+  };
+
+  /* Amazon publishes each delivery option as attributes on the message span,
+     next to the English sentence: the fee, the date, the basket minimum and the
+     cutoff as separate values. Read those instead of parsing the prose — it is
+     exact, and it survives a storefront that renders the sentence in another
+     language. PDM is the first option, SDM the second. Verified 2026-08-19;
+     contract in reference/delivery.md. Falls back to prose when absent, which
+     does happen. */
+  const readDeliveryOptions = () => {
+    const slot = { DEXUnifiedCXPDM: 'primary', DEXUnifiedCXSDM: 'secondary' };
+    const seen = new Set();
+    const out = [];
+    document.querySelectorAll('[data-csa-c-content-id="DEXUnifiedCXPDM"], [data-csa-c-content-id="DEXUnifiedCXSDM"]')
+      .forEach((el) => {
+        const a = (n) => el.getAttribute('data-csa-c-' + n) || null;
+        const row = {
+          slot: slot[el.getAttribute('data-csa-c-content-id')],
+          cost: a('delivery-price'),          // "FREE" | "$5.85" | "fastest"
+          when: a('delivery-time'),
+          condition: a('delivery-condition'), // "on qualifying orders over $25"
+          cutoff: a('delivery-cutoff'),
+          program: a('delivery-benefit-program-id'),
+          subType: a('mir-sub-type'),
+        };
+        // The block is re-rendered per breakpoint; the same option repeats.
+        const k = [row.slot, row.cost, row.when, row.condition, row.cutoff].join('~');
+        if (seen.has(k)) return;
+        seen.add(k);
+        out.push(row);
+      });
+    return out;
+  };
+
   window.scrollTo(0, document.body.scrollHeight * 0.6);
   await new Promise((r) => setTimeout(r, 2000));
   window.scrollTo(0, document.body.scrollHeight * 0.85);
@@ -49,12 +114,26 @@
     asin: (document.querySelector('#ASIN') || {}).value || null,
     title: (txt('#productTitle') || '').slice(0, 120),
 
-    price: txt('#corePrice_feature_div .a-offscreen'),
+    price: priceIn(),
     listPrice: txt('.basisPrice .a-offscreen'),
 
     // Read the inner status span: #availability's raw text is glued to a blob of
-    // embedded JSON config.
-    availability: txt('#availability .a-color-success') || txt('#availability .a-color-price'),
+    // embedded JSON config. Keep every sentence — "In stock" and "In stock.
+    // Usually ships within 4 to 5 days" are different answers, and the second
+    // one is the reason a September date sits under an in-stock badge.
+    availability: txt('#availability .a-color-success')
+      || txt('#availability .a-color-price')
+      || txt('#availability .a-color-state'),
+
+    // No buy box means nothing is purchasable at this URL, whatever price the
+    // page still shows. On a variant parent that price belongs to a different
+    // variant: B003J9LZE4 read $108.99 for a size this URL cannot sell.
+    buyable: !!(document.querySelector('#add-to-cart-button') || document.querySelector('#buy-now-button')),
+
+    // Structured, one entry per option, with the fee and the basket minimum as
+    // their own fields. Prefer this over the three prose fields below; they are
+    // kept because it is empty on some listings.
+    deliveryOptions: readDeliveryOptions(),
 
     deliveryPromise: primary,
     // The slower free alternative, e.g. "Or FREE delivery Friday, August 14".

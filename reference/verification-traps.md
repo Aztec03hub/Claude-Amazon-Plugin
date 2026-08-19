@@ -14,9 +14,10 @@ An anonymous fetch always renders *a* delivery promise, for whatever ZIP the
 requesting IP resolves to. It never errors and never says which. Read `ship_to`
 before quoting `delivery`.
 
-Also: an anonymous date is the **non-Prime** date. On one seven-ASIN shortlist
-the anonymous route said 21 August for every row while the signed-in Prime
-session said 17 August for five of them.
+Also: a listing offers up to **two** delivery options, differing in cost as well
+as speed, and `#deliveryBlockMessage` returns only the first. The second one is
+where the Prime date usually is — including on an anonymous fetch. Read
+`delivery_options`, not `delivery`; contract in [delivery.md](delivery.md).
 
 ## Item Dimensions may be folded or unfolded, in the same field
 
@@ -41,6 +42,101 @@ One cart's first bullet opens "At just 4 lbs" while its own spec table says
 `Item Weight: 2.8 pounds`. Neither is flagged; both are on the page. Where the
 number decides the purchase, read both and record the disagreement rather than
 picking the one you prefer.
+
+## The first price on the page is the List Price
+
+The struck-through "List Price" is rendered in the same block as the price you
+would pay, and on discounted listings it comes **first**. An extractor that takes
+the first price span therefore reports the list price, silently, with no marker.
+
+Measured 2026-08-19 on ASIN `0140449132`: the plugin reported `$16.00` against a
+real `$12.91` — a 24% overstatement. Skip any price whose enclosing `a-price`
+span carries `a-text-price`, `data-a-strike="true"` or `basisprice`.
+
+`#corePrice_feature_div` is additionally **empty on books**; the price lives in
+`#corePriceDisplay_desktop_feature_div`.
+
+And the raw HTML and the live DOM disagree about where the value is. In the HTML
+the `priceToPay` screen-reader span carries it; in the rendered DOM that span is
+blank and the price is assembled from `.a-price-symbol` / `-whole` / `-fraction`.
+A selector proven against one will return nothing against the other.
+
+## A price with no buy box belongs to something else
+
+A variant parent with no featured offer renders no buy box, no delivery block and
+no seller row — but the page still carries prices belonging to **other variants**,
+and an extractor will return one.
+
+Measured 2026-08-19 on `B003J9LZE4`: `$108.99`, `availability: ""`, no delivery.
+Nothing said the item could not be bought. Note this defeats the usual test:
+`Currently unavailable` appears only inside JavaScript config strings on such a
+page, never as rendered text.
+
+The reliable check is the absence of `#add-to-cart-button` and `#buy-now-button`.
+`amazon_fetch.py` reports it as `buyable` and attaches a `no_offer_warning`.
+
+A real browser can disagree here: navigating to the same parent URL redirected to
+`?th=1` and pinned a variant, so the browser saw a buy box where the anonymous
+fetch saw none. Same ASIN, two answers, both correct for what they fetched.
+
+## The stock line has a second sentence
+
+`In stock` and `In stock. Usually ships within 4 to 5 days` are different answers,
+and reading only the first span of `#availability` returns the same text for both.
+The handling-time sentence is often the reason a September date sits under an
+in-stock badge. `Only 17 left in stock - order soon` lives in a different colour
+class again.
+
+## `textContent` on a fetched document pulls in scripts
+
+`DOMParser` builds a document with no layout, so `innerText` is empty and
+`textContent` is the obvious substitute — but it concatenates the contents of
+every `<script>` and `<style>` too. Three consequences, all observed:
+
+- `#availability` returns `In Stock` followed by an inline stylesheet;
+- `#olp_feature_div` returns nothing but CSS;
+- the page's inline JSON — including session identifiers — lands in your context,
+  and the Chrome extension blocks the whole tool result as cookie/query-string
+  data.
+
+Strip `script`, `style` and `noscript` before reading text from a parsed document.
+
+## `?aod=1` returns 200, 3 MB, and no offers
+
+The "all sellers and offers" panel is client-rendered. Fetching `/dp/<ASIN>?aod=1`
+or `/gp/offer-listing/<ASIN>` same-origin returns HTTP 200 and a full-size page
+containing **zero** `#aod-offer` nodes — a textbook success-shaped failure. The
+older ajax endpoints (`/gp/product/ajax?...experienceId=aodAjaxMain` and
+variants) now return **404**.
+
+Opening `?aod=1` in a real tab does work, for a human. Treat it as a handoff URL,
+not a data source.
+
+## `Sold by` and `Shipper / Seller` are different facts
+
+`#sellerProfileTriggerId` and the `merchantName` JSON key are both gone from the
+page as of 2026-08-19, so any extractor keyed on them returns null on every
+listing while looking like it simply found no seller.
+
+What renders today is `#merchantInfoFeature_feature_div`, and its **label** is
+itself the fulfilment signal:
+
+| Label | Means |
+| --- | --- |
+| `Sold by X` + `#fulfillerInfoFeature_feature_div` = `Ships from Amazon` | FBA — merchant sells, Amazon fulfils |
+| `Shipper / Seller X`, fulfiller div empty | The merchant does both |
+
+Both values are duplicated in the markup for the responsive layouts
+(`Sold by waveshare waveshare Sold by waveshare`). The repeat is a layout
+artefact, not a second seller.
+
+## A dead ASIN 404s on fetch but not on open
+
+A same-origin `fetch` of `/dp/<ASIN>` for an ASIN with no listing on this
+storefront returns a genuine **HTTP 404** with a ~2 KB body. That is a real
+existence check, and it is one the `xdg-open` route cannot perform — see *An
+opened tab is not a live product* above. Two routes, and only one of them can
+tell you whether the thing exists.
 
 ## Grid prices are positional; listing prices are not
 

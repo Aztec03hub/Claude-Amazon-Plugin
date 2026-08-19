@@ -11,7 +11,7 @@ fail in ways that look like success.
 | Non-Amazon retailer or manufacturer pages | `WebFetch` | Works |
 | **Amazon search or product pages** | `WebFetch` | **Fails.** HTTP 500 on `/dp/`, 503 on `/s?k=`. Not transient. |
 | **Amazon search or product pages** | **`scripts/amazon_fetch.py`** | **Works. Default.** Local machine, browser headers. |
-| Prime arrival date, coupons, Prime-exclusive price, cart, order history | A real signed-in browser | Only route that can answer these |
+| Same-day/overnight availability, the Prime basket minimum, coupons, Prime-exclusive price, cart, order history | A real signed-in browser | Only route that can answer these. The standard Prime date is **not** on this list -- the anonymous route has it; see below |
 | Amazon, if the local route is walled | A real browser | Retrying curl reproduces the same wall |
 
 ## The status code is not the success test
@@ -54,22 +54,36 @@ product page and reads as Winchester MA 01890. Match the labelled fields only.
 unresolved `Update location` placeholder, so do not expect a ZIP back from
 `search`.
 
-### The anonymous date is the non-Prime date
+### A single delivery string is the wrong shape
 
-What the local route returns is the free-shipping-over-$35 promise. The Prime
-date is faster — often by several days — and renders only as an intermittent
-upsell line that Amazon A/B tests (present on one fetch of an ASIN, absent from
-a repeat fetch of the same ASIN minutes later).
+A listing offers up to two options that differ in **cost** as well as speed, and
+`#deliveryBlockMessage` — which is what a naive read returns — stops at the first
+`</div>`, giving you only the first one. Read `delivery_options` instead, which
+`amazon_fetch.py listing` returns from the structured `data-csa-c-*` attributes
+Amazon publishes beside the prose. Full contract: [delivery.md](delivery.md).
 
-Measured on one seven-ASIN shortlist: anonymous said `Friday, August 21` for
-every row; the signed-in Prime session said `Tomorrow, August 17` for five of
-them and offered an overnight slot on three. A four-day error, in the direction
-that loses a sale.
+### What the anonymous route can and cannot see
 
-So: quote the anonymous date as the **worst case**, and go to a real browser
-whenever the actual arrival date decides the purchase.
+Corrected 2026-08-19. This page previously said the anonymous route only ever
+returns the non-Prime promise and understates arrival by several days. That is
+true of `#deliveryBlockMessage` and **false of the page**: the Prime date is in
+the second option, and on five Amazon-fulfilled ASINs it matched the signed-in
+session exactly (`Tomorrow, August 20` on both routes).
 
-Coupons never render anonymously at all.
+What a signed-in session actually adds:
+
+- the **same-day / overnight upgrade** — anonymous offered "FREE Monday,
+  August 24" where signed-in offered "FREE Overnight 4 AM - 8 AM";
+- the **lower basket minimum** — $25 signed in against $35 anonymous;
+- the **order-within cutoff** on the leading option;
+- coupons and Prime-exclusive pricing, which never render anonymously at all.
+
+On merchant-fulfilled items the signed-in session added nothing at all: four
+paid-shipping ASINs were identical field for field on both routes. Escalating to
+a browser for those spends a session for no new fact.
+
+And a Prime date assumes a live membership on the delivery date, which no product
+page knows. See [delivery.md](delivery.md#is-prime-actually-in-force).
 
 ## Batch the shortlist in one browser call
 

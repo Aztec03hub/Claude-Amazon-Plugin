@@ -107,7 +107,7 @@ say that the ASIN needs to be looked up again on the other storefront.
 | Product page | `/dp/<ASIN>` |
 | All reviews | `/product-reviews/<ASIN>` |
 | Critical reviews only | `/product-reviews/<ASIN>?filterByStar=critical` |
-| All sellers and offers | `/dp/<ASIN>?aod=1` |
+| All sellers and offers | `/dp/<ASIN>?aod=1` — for the user's eyes only. Fetching it returns HTTP 200 and 3 MB with **zero** offers in the markup; the panel is client-rendered. |
 
 The critical-reviews link is the useful one before an expensive purchase: the
 average hides the failure mode, the one-star text names it.

@@ -42,7 +42,7 @@ specifically *what does Amazon say*.
 | --- | --- |
 | `/amazon:amazon-find <need>` | Category-first research: establish what actually solves the problem, search, verify, recommend one with a trade-off |
 | `/amazon:amazon-check <ASIN\|URL>...` | Verified price, stock, rating, seller and specs, read off the listing |
-| `/amazon:amazon-delivery <ASIN>...` | Real Prime dates, coupons and Prime-exclusive pricing from your signed-in browser |
+| `/amazon:amazon-delivery <ASIN>...` | Same-day/overnight availability, the Prime basket minimum, cutoffs, coupons and Prime-exclusive pricing from your signed-in browser |
 
 ## Skills
 
@@ -60,7 +60,8 @@ Anonymous, cheap, stateless — start here:
 
 Signed-in browser, for facts that only a session renders:
 
-- **`amazon-delivery-check`** — Prime dates, overnight cut-offs, coupons.
+- **`amazon-delivery-check`** — overnight availability, cut-offs, coupons, and
+  whether Prime is still in force on the delivery date.
 - **`amazon-search`** — filtered search with per-card real delivery, using the
   facet grammar and tested extractors in `profiles/amazon-us.json`.
 - **`brand-scrub`** — harvests the brand facet into a durable allow/blocklist, so
@@ -137,8 +138,9 @@ speaks to, and `profiles/amazon-us.json` is that storefront's search grammar.
 - **Never recover the ZIP by regexing for five digits.** Amazon's asset
   filenames collide with real ZIPs — `01890+Vwk8L.css` reads as Winchester MA on
   every product page.
-- **An anonymous date is the non-Prime date.** Measured gap on one seven-ASIN
-  shortlist: four days.
+- **Delivery is two priced options, not one date.** The fast one usually carries
+  a basket minimum. `#deliveryBlockMessage` returns only the first; the Prime
+  date is normally the second, and it is present anonymously.
 - **`Item Dimensions` may be folded or unfolded**, in the same field, with
   nothing to distinguish them — and a large height is often handle height.
 - **Delivery filters are sticky across browser searches** and mutually
@@ -155,6 +157,7 @@ speaks to, and `profiles/amazon-us.json` is that storefront's search grammar.
 
 Full detail in [`reference/`](reference):
 [fetch-routes](reference/fetch-routes.md) ·
+[delivery](reference/delivery.md) ·
 [marketplaces](reference/marketplaces.md) ·
 [search-filters](reference/search-filters.md) ·
 [verification-traps](reference/verification-traps.md)
