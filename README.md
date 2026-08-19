@@ -70,6 +70,17 @@ Signed-in browser, for facts that only a session renders:
   state into the user config from the session, so the interview covers only what
   Amazon cannot answer.
 
+Account state — the order history and the address book:
+
+- **`amazon-order-history`** — when you bought it, what you paid, what is
+  arriving, and whether you have bought this ASIN before. Read-only.
+- **`amazon-address-book`** — read the address book, correct a street or
+  postcode, add a place, change the default ship-to. Every change is confirmed
+  against a diff and verified afterwards.
+- **`amazon-order-cancel`** — cancel an order or individual items in one, with
+  explicit confirmation before submitting and a check against the order itself
+  afterwards. The only skill here that changes a real order.
+
 `profiles/amazon-us.json` holds everything volatile — facet IDs, sort keys,
 selectors, trust rubric, session-dependence notes. When Amazon changes, that is
 the file that gets edited. See [`profiles/README.md`](profiles/README.md).
@@ -155,12 +166,26 @@ speaks to, and `profiles/amazon-us.json` is that storefront's search grammar.
 - **The currency is a property of the route, not the listing.** `amazon.com`
   renders ILS from an Israeli IP and USD from a US one, same URL, same ASIN.
 
+- **Order history does not survive a fetch.** The page ships ten empty
+  `.order-card` shells and fills them client-side, so a fetch returns HTTP 200,
+  950 KB and zero orders. The address book, which looks identical from outside,
+  fetches fine. One of these two pages needs a rendered tab and the other does
+  not.
+- **An address field ID appears once per responsive layout**, so a book of six
+  addresses carries twelve nodes with the same id. `querySelector` returns the
+  first — someone else's flat, with no error.
+- **A cancelled order loses its structure.** Ship-to, payment, totals and the
+  shipment box all disappear, so the status selector returns empty rather than
+  `Cancelled`, and a missing total on an order card is data rather than a
+  parse failure.
+
 Full detail in [`reference/`](reference):
 [fetch-routes](reference/fetch-routes.md) ·
 [delivery](reference/delivery.md) ·
 [marketplaces](reference/marketplaces.md) ·
 [search-filters](reference/search-filters.md) ·
-[verification-traps](reference/verification-traps.md)
+[verification-traps](reference/verification-traps.md) ·
+[account-pages](reference/account-pages.md)
 
 ## Privacy and safety
 
@@ -168,9 +193,16 @@ Full detail in [`reference/`](reference):
   skills ask for one rather than assuming, and report the ZIP a page actually
   resolved to alongside any date.
 - `amazon_fetch.py` is anonymous and stateless — no cookies, no session.
-- The browser skill is read-only. It does not add to cart, place orders, or
-  click controls. If a navigation lands on an unexpected page it opens a fresh
-  tab instead of interacting.
+- The research browser skills are read-only. They do not add to cart, place
+  orders, or click controls. If a navigation lands on an unexpected page they
+  open a fresh tab instead of interacting.
+- **Two skills write to the account, and only those two.**
+  `amazon-address-book` changes a delivery address; `amazon-order-cancel`
+  cancels an order or items in one. Both state exactly what is about to change,
+  wait for the user's explicit yes on that specific change, and verify the
+  outcome against the account afterwards rather than trusting a success banner.
+  Neither removes an address, and nothing here places an order or touches a
+  payment method.
 
 ## Install
 

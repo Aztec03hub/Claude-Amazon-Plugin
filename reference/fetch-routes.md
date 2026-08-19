@@ -115,6 +115,12 @@ page whose controls cancel real orders. Read-only same-origin fetches cannot
 wander like that. If a navigation does land somewhere unexpected, click nothing
 and open a fresh tab.
 
+That page is now identified: it is the target of the **Cancel items** button on
+any order-details page, one link from every live order. See
+[account-pages.md](account-pages.md), where the flow is mapped deliberately for
+`amazon-order-cancel`. Knowing where it comes from does not soften the rule —
+arriving there without asking still means click nothing.
+
 ## Reading a delivery date out of a rendered page
 
 Ask for the delivery date **in the main buy box only, not sponsored or related

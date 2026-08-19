@@ -222,7 +222,10 @@ def main():
     else:
         out = resolve(a.args[0] if a.args else None)
 
-    print(json.dumps(out, indent=2, ensure_ascii=False))
+    # default=str: PyYAML parses an unquoted `deadline: 2026-09-01` into a
+    # datetime.date, which json.dumps cannot serialise - so `show` crashed with a
+    # TypeError on any config carrying a delivery deadline, which is most of them.
+    print(json.dumps(out, indent=2, ensure_ascii=False, default=str))
 
 
 if __name__ == "__main__":

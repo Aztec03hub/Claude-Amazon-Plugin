@@ -107,6 +107,10 @@ If that happens: click nothing, open a fresh tab, and prefer the read-only
 same-origin fetch above, which cannot wander. Never click a control on a page
 you did not intend to open.
 
+That page is the **Cancel items** target for an order — one link from every live
+order, which is how a navigate reached it. `amazon-order-cancel` goes there on
+purpose; this skill never should.
+
 ## Procedure
 
 1. `tabs_context_mcp` first. Create a new tab rather than reusing one of the
