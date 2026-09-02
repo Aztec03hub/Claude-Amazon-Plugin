@@ -27,7 +27,7 @@ rather than forked — see [Configuration](#configuration).
 
 It is deliberately narrow, and complements rather than replaces:
 
-- [`procurement-tools`](https://github.com/danielrosehill/Claude-Purchasing-Plugin) —
+- [`procurement-tools`](https://github.com/danielrosehill/procurement-tools-plugin) —
   the generalist ecommerce research plugin: intake, specs, cross-vendor
   comparison, recommendations, preference memory.
 - [`shopping`](https://github.com/danielrosehill/Claude-Shopping-Plugin) —
@@ -97,7 +97,7 @@ user directory, found by search rather than by a hardcoded path:
 | 3 | `<user-data-root>/procurement-tools/` |
 
 `addresses.yaml` and `marketplaces.yaml` are already owned by
-[`procurement-tools`](https://github.com/danielrosehill/Claude-Purchasing-Plugin),
+[`procurement-tools`](https://github.com/danielrosehill/procurement-tools-plugin),
 and a delivery address is not Amazon-specific knowledge, so this plugin adopts
 that store instead of forking it. It never migrates one silently — two copies of
 an address is how a delivery date gets quoted for last year's flat.
