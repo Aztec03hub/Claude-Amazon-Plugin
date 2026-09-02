@@ -10,7 +10,9 @@ Use the `amazon-listing-check` skill.
 1. Pull the ten-character ASIN out of each argument — the token after `/dp/` or
    `/gp/product/` in a URL. Everything else in an Amazon URL is tracking.
 2. Run `scripts/amazon_fetch.py listing` with **every ASIN in one call**. Pass
-   `--expect-zip` if the user gave a ZIP or one is already known this session.
+   `--zip` with the user's postcode. Without it Amazon renders the page for
+   whatever location this process appears to be in, which is wrong everywhere
+   except the user's own machine, and looks identical when it is.
 3. Report price, stock, rating with review count, seller, and any spec that
    bears on the question.
 
