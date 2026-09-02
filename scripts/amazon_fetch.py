@@ -39,6 +39,7 @@ Drive a real browser for those.
 Usage:
     amazon_fetch.py listing B0CHHB4RHV [ASIN ...] [--expect-zip 02139]
     amazon_fetch.py search "usb c power bank" [--rh p_85:2470955011]
+    amazon_fetch.py variants B0CHHB4RHV [--pick "Style=5 Pack"]
     amazon_fetch.py probe          # is the local route working at all?
 
     ... and -m/--marketplace on any of them to reach a storefront other than the
@@ -159,6 +160,58 @@ def set_delivery_zip(postcode):
         raise RuntimeError("Amazon rejected postcode %r on %s: %s"
                            % (postcode, DOMAIN, body[:200]))
     return r.get("address", {})
+
+
+# Amazon ships the whole variation matrix inside the product page as a JSON
+# blob: every child ASIN mapped to its option values, plus the dimension names.
+# Reading it is the difference between quoting a single unit and noticing that
+# the same thing exists as a five-pack for less than four singles cost.
+# Option values that denote how many units you get, rather than which unit.
+# Matched against the value because Amazon's dimension labels are seller-chosen:
+# "Style" holds the pack count on one listing and "Size" holds it on the next.
+QUANTITY_VALUE = re.compile(
+    r"\b(\d+\s*[- ]?(pack|pk|count|ct|pcs|pieces?)|pack\s+of\s+\d+|single|"
+    r"set\s+of\s+\d+|twin\s*pack|multipack)\b", re.I)
+
+
+def variations(page):
+    """Parse the twister matrix out of a product page.
+
+    Returns {"dimensions": [...], "children": {asin: [values...]}} or None.
+    A page with no options has no matrix, which is not an error.
+    """
+    m = re.search(r'"dimensionValuesDisplayData"\s*:\s*(\{.*?\})\s*,\s*"[a-zA-Z]',
+                  page, re.S)
+    if not m:
+        return None
+    try:
+        children = json.loads(m.group(1))
+    except ValueError:
+        return None
+    if not children:
+        return None
+
+    labels = {}
+    lm = re.search(r'"variationDisplayLabels"\s*:\s*(\{.*?\})\s*,\s*"[a-zA-Z]',
+                   page, re.S)
+    if lm:
+        try:
+            labels = json.loads(lm.group(1))
+        except ValueError:
+            labels = {}
+
+    dims = []
+    dm = re.search(r'"dimensions"\s*:\s*(\[[^\]]*\])', page)
+    if dm:
+        try:
+            dims = [labels.get(d, d) for d in json.loads(dm.group(1))]
+        except ValueError:
+            dims = []
+    if not dims:
+        width = max(len(v) for v in children.values())
+        dims = ["dimension %d" % (i + 1) for i in range(width)]
+
+    return {"dimensions": dims, "children": children}
 
 
 def text(s):
@@ -373,6 +426,46 @@ def listing(asin, expect_zip=None):
         "url": f"https://{DOMAIN}/dp/{asin}",
     }
 
+    var = variations(s)
+    if var:
+        mine = var["children"].get(asin)
+        out["variants"] = {"dimensions": var["dimensions"],
+                           "this": mine,
+                           "sibling_count": len(var["children"]) - 1}
+        if mine:
+            # Siblings that differ from this ASIN in exactly one dimension are
+            # the ones a buyer would actually consider. Surfacing them is the
+            # difference between quoting one unit and noticing the same thing
+            # exists as a five-pack for less than four singles cost.
+            also = {}
+            for dim_i, dim_name in enumerate(var["dimensions"]):
+                vals = sorted({
+                    v[dim_i] for v in var["children"].values()
+                    if len(v) == len(mine)
+                    and all(v[j] == mine[j] for j in range(len(mine)) if j != dim_i)
+                    and v[dim_i] != mine[dim_i]})
+                if vals:
+                    also[dim_name] = vals
+            if also:
+                out["variants"]["also_available"] = also
+                # A quantity dimension is the one that silently costs money:
+                # buying N singles when an N-pack exists is never cheaper, and
+                # nothing on the single's page says so.
+                #
+                # Detect it by its VALUES, not its name. Amazon's dimension
+                # labels are seller-chosen and unreliable - on the Monoprice
+                # cable the pack count lives under "Style" while "Size" means
+                # cable length, so keying on the name flags the lengths and
+                # misses the packs, which is exactly backwards.
+                qty = [d for d, vals in also.items()
+                       if any(QUANTITY_VALUE.search(v) for v in vals)]
+                if qty:
+                    out["variants"]["check_pack_size"] = (
+                        "This listing has other %s options (%s). Price them "
+                        "before recommending a quantity of this one."
+                        % (" and ".join(qty),
+                           "; ".join("%s: %s" % (d, ", ".join(also[d])) for d in qty)))
+
     if not out["buyable"]:
         # A variant parent with no featured offer renders no buy box, no
         # delivery block and no seller -- but still carries prices belonging to
@@ -437,6 +530,59 @@ def search(query, rh=None):
                     "recommending anything"}
 
 
+def variant_matrix(asin, picks=None):
+    """Every option combination for a listing, and the ASIN that sells it.
+
+    Amazon renders each combination as its own ASIN. Changing an option in a
+    browser is therefore navigation, not configuration - so resolving options
+    to an ASIN here is both cheaper and more reliable than clicking, and it
+    works without a signed-in session.
+    """
+    s = fetch("https://%s/dp/%s" % (DOMAIN, asin))
+    if blocked(s):
+        return {"asin": asin, "error": "blocked or empty response", "bytes": len(s)}
+
+    var = variations(s)
+    if not var:
+        return {"asin": asin, "variants": None,
+                "note": "this listing has no selectable options"}
+
+    dims, children = var["dimensions"], var["children"]
+    lower = [d.lower() for d in dims]
+    matched = dict(children)
+    applied = []
+
+    for pick in picks or []:
+        if "=" not in pick:
+            return {"asin": asin, "error": "bad --pick %r, expected Dimension=Value" % pick,
+                    "dimensions": dims}
+        name, want = (x.strip() for x in pick.split("=", 1))
+        if name.lower() not in lower:
+            return {"asin": asin, "error": "unknown dimension %r" % name,
+                    "dimensions": dims}
+        i = lower.index(name.lower())
+        hits = {a: v for a, v in matched.items()
+                if len(v) > i and v[i].lower() == want.lower()}
+        if not hits:
+            return {"asin": asin, "error": "no variant with %s=%r" % (dims[i], want),
+                    "available": sorted({v[i] for v in matched.values() if len(v) > i})}
+        matched, _ = hits, applied.append("%s=%s" % (dims[i], want))
+
+    return {
+        "asin": asin,
+        "dimensions": dims,
+        "this": children.get(asin),
+        "total_variants": len(children),
+        "picks_applied": applied,
+        "matches": [{"asin": a, "values": v} for a, v in sorted(matched.items(),
+                                                               key=lambda kv: kv[1])],
+        "options": {d: sorted({v[i] for v in children.values() if len(v) > i})
+                    for i, d in enumerate(dims)},
+        "note": "these are option-to-ASIN mappings only. Prices and stock differ "
+                "per variant - run `listing` on the ASIN you pick.",
+    }
+
+
 def probe(marketplace, asin=None):
     """Is the local route working, and where does Amazon think we are?
 
@@ -474,7 +620,7 @@ def probe(marketplace, asin=None):
 def main():
     p = argparse.ArgumentParser(add_help=True, description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("mode", choices=["listing", "search", "probe"])
+    p.add_argument("mode", choices=["listing", "search", "probe", "variants"])
     p.add_argument("args", nargs="*")
     p.add_argument("--expect-zip", "--expect-postcode", dest="expect_zip",
                    help="warn if the page resolves elsewhere; ZIP in the US, "
@@ -483,6 +629,9 @@ def main():
                    choices=sorted(MARKETPLACES["marketplaces"]),
                    help="which Amazon storefront (default: %(default)s)")
     p.add_argument("--rh", help="Amazon filter nodes, e.g. p_85:2470955011")
+    p.add_argument("--pick", action="append", metavar="DIM=VALUE",
+                   help="narrow `variants` to one option value, e.g. "
+                        "--pick \"Style=5 Pack\". Repeatable.")
     p.add_argument("--zip", "--postcode", dest="zip",
                    help="render every page for this delivery postcode instead "
                         "of whatever this host's IP implies. Required whenever "
@@ -517,6 +666,10 @@ def main():
         if not a.args:
             sys.exit("search needs a query")
         out = search(" ".join(a.args), a.rh)
+    elif a.mode == "variants":
+        if not a.args:
+            sys.exit("variants needs an ASIN")
+        out = variant_matrix(a.args[0], a.pick)
     else:
         out = probe(a.marketplace, a.args[0] if a.args else None)
 
