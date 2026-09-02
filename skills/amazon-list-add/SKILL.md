@@ -95,15 +95,41 @@ stack, and a coordinate that drifts by a row buys something.
 
 A JavaScript `.click()` on `#wishListDropDown` does **not** open the menu -
 Amazon's declarative handler does not fire for it, and the popover renders
-empty. Click the element for real.
+empty. Nor does a dispatched `MouseEvent` sequence (`pointerdown`, `mousedown`,
+`pointerup`, `mouseup`, `click`, all `bubbles:true`); the handler only responds
+to a genuinely trusted click. Use the `computer` tool on a ref from `find`.
 
-The menu is lazy-loaded behind a spinner. Wait for entries before selecting; an
-immediate query returns an empty popover.
+**The dropdown click is unreliable, and this is the main thing to plan for.**
+Measured over six consecutive adds on one account, roughly half the first
+clicks failed to open the menu, with no error and no visible change. Retrying
+sometimes worked and sometimes did not, on the same ASIN, seconds apart.
+`scroll_to` before the click made no difference either way.
+
+So: after clicking, **always** check that the menu opened before assuming
+anything:
+
+```js
+[...document.querySelectorAll('[id^="atwl-link-to-list-"]')].length
+```
+
+Zero means the menu never opened and **nothing was added**. Do not report the
+item as added. Retry once; if it fails again, stop and tell the user which
+ASINs did not get added, with their `/dp/` links, rather than looping. This
+failure is in Amazon's UI, not in the request, and hammering it does not help.
+
+Once the entries exist, a JavaScript `.click()` on the list link **does** work -
+that half is reliable. It is only opening the menu that is flaky.
+
+Never fall back to `#wishListMainButton` when the dropdown will not open. It
+adds to the default list, which is not the list that was confirmed.
 
 ## Verify
 
-The inline confirmation (`#atwl-inline-sucess-msg`) is a signal, not the thing.
-Re-read the list and confirm the ASIN is present:
+The inline confirmation is not a signal at all. Both `#atwl-inline-sucess-msg`
+and `#atwl-inline-error-msg` are pre-rendered templates that **always carry
+text** - a successful add returns "Added to" and "Unable to add item to List.
+Please try again." simultaneously, with the container not even visible. Reading
+either one tells you nothing. Re-read the list:
 
 ```
 https://<domain>/hz/wishlist/ls/<LISTID>
