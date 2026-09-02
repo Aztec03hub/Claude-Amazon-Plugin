@@ -1,7 +1,7 @@
 ---
 name: amazon-open-asin
 description: Open one or more Amazon ASINs in the user's own browser, on the right regional storefront, as clean canonical /dp/ URLs with the tracking stripped. Use when the user says open, show me, pull up, or let me look at an Amazon product, or wants to finish a purchase decision by eye after a shortlist. This hands the page over and reads nothing — for facts about the product use amazon-listing-check instead.
-allowed-tools: Bash(xdg-open *), Bash(python3 *), Bash(*/user_config.py *), mcp__claude-in-chrome__tabs_context_mcp, mcp__claude-in-chrome__tabs_create_mcp, Read
+allowed-tools: Bash(python3 *), Bash(*/user_config.py *), Bash(*/open_url.py *), mcp__claude-in-chrome__tabs_context_mcp, mcp__claude-in-chrome__tabs_create_mcp, Read
 ---
 
 # Amazon open ASIN
@@ -64,13 +64,20 @@ a search term, and belongs to `amazon-shortlist`.
 
 ## Opening it
 
-Default route, one line, no dependencies:
+Default route, one line, no dependencies beyond the Python this plugin already
+needs:
 
 ```bash
-xdg-open "https://www.amazon.com/dp/B0CHHB4RHV" >/dev/null 2>&1
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/open_url.py" "https://www.amazon.com/dp/B0CHHB4RHV"
 ```
 
-The default browser here is Chrome, so this lands in the user's real signed-in
+Do **not** call `xdg-open` directly. It exists only on Linux and BSD desktops —
+the equivalent is `open` on macOS and `start` on Windows — so hardcoding it
+breaks this skill outright on the other two platforms. `open_url.py` wraps
+`webbrowser` from the standard library, which resolves the right handler per
+platform, and takes several URLs in one call.
+
+This lands in the user's default browser, and so in their real signed-in
 profile — prices, Prime badges and delivery dates on the opened page are the
 user's own, for whichever storefront that account is signed in to.
 
@@ -85,8 +92,10 @@ window the user was using for something else.
 
 ## The trap in this skill
 
-**A successful open is not evidence the ASIN exists.** `xdg-open` hands the URL
-to an already-running Chrome and exits 0 immediately; it never sees the response.
+**A successful open is not evidence the ASIN exists.** The platform opener hands
+the URL to an already-running browser and returns as soon as it is accepted; it
+never sees the response. `open_url.py` reports `opened: true` on exactly that
+basis and says so in its own output.
 A retired, mistyped or wrong-storefront ASIN opens Amazon's "Sorry, we couldn't
 find that page" dog with exactly the same exit status as a live product.
 
