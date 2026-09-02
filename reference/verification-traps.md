@@ -134,7 +134,7 @@ artefact, not a second seller.
 
 A same-origin `fetch` of `/dp/<ASIN>` for an ASIN with no listing on this
 storefront returns a genuine **HTTP 404** with a ~2 KB body. That is a real
-existence check, and it is one the `xdg-open` route cannot perform — see *An
+existence check, and it is one the browser-handoff route cannot perform — see *An
 opened tab is not a live product* above. Two routes, and only one of them can
 tell you whether the thing exists.
 
@@ -186,8 +186,10 @@ them. A missing price is not a cheap price.
 
 ## An opened tab is not a live product
 
-`xdg-open` hands a URL to an already-running browser and exits 0 without ever
-seeing the response. A retired, mistyped or region-wrong ASIN opens Amazon's
+Any platform opener — `xdg-open` on Linux, `open` on macOS, `start` on Windows,
+and `scripts/open_url.py`, which wraps all three — hands a URL to an
+already-running browser and returns without ever seeing the response. A retired,
+mistyped or region-wrong ASIN opens Amazon's
 "Sorry, we couldn't find that page" placeholder with exactly the same exit
 status as a live listing. Opening is a handoff, not a check.
 
