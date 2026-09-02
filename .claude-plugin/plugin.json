@@ -1,6 +1,6 @@
 {
   "name": "amazon",
-  "version": "2.3.0",
+  "version": "2.3.1",
   "description": "Fork of danielrosehill/Claude-Amazon-Plugin with Windows portability fixes and a --zip delivery-postcode override. Claude Code plugin: Amazon marketplace research across Amazon's regional storefronts — verified price, stock, rating, seller and specs from the listing rather than the search grid; delivery dates checked against the postcode they were actually rendered for; storefront, currency and egress resolved from the user's stored delivery addresses rather than assumed. Works around the fact that the default fetch tool cannot reach Amazon and that every fallback route fails in a way that resembles success. Also reads and maintains signed-in account state: order history, the delivery address book, and order cancellation.",
   "author": {
     "name": "Daniel Rosehill",
