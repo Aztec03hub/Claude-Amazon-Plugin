@@ -11,8 +11,8 @@
       "description": "Amazon marketplace research across regional storefronts: verified price, stock, rating, seller and specs read from the listing rather than the search grid, delivery dates checked against the postcode they were rendered for. Fork of danielrosehill/Claude-Amazon-Plugin with Windows portability fixes applied.",
       "category": "productivity",
       "source": {
-        "source": "local",
-        "path": "."
+        "source": "github",
+        "repo": "Aztec03hub/Claude-Amazon-Plugin"
       },
       "homepage": "https://github.com/Aztec03hub/Claude-Amazon-Plugin"
     }
