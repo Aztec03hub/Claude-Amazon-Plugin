@@ -27,8 +27,8 @@ sentence, then research the needed thing. Do not silently substitute.
 ## 2. Search
 
 ```bash
-python3 "${CLAUDE_PLUGIN_ROOT}/scripts/amazon_fetch.py" search "folding luggage cart travel"
-python3 "${CLAUDE_PLUGIN_ROOT}/scripts/amazon_fetch.py" search "usb c power bank" --rh p_85:2470955011
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/amazon_fetch.py" search "folding luggage cart travel" --zip 02139
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/amazon_fetch.py" search "usb c power bank" --rh p_85:2470955011 --zip 02139
 ```
 
 Run **several differently-phrased queries**, not one. Amazon's index is

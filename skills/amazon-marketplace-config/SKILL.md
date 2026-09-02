@@ -64,7 +64,7 @@ not because the US is the answer.
 
 ```bash
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/amazon_fetch.py" listing B0XXXXXXXX \
-    -m amazon-uk --expect-postcode "SW1A 1AA"
+    -m amazon-uk --postcode "SW1A 1AA"
 ```
 
 Three things the resolver tells you that change the answer:
