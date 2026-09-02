@@ -56,6 +56,15 @@ import subprocess
 import sys
 from pathlib import Path
 
+# Windows consoles default to a legacy code page - cp1252 on an en-US install -
+# and every payload here is written with ensure_ascii=False. A single character
+# outside that page in a product title is enough to abort the whole run with
+# UnicodeEncodeError after the fetch has already been paid for. Force UTF-8 on
+# the streams this script owns; a no-op where the encoding is already UTF-8.
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+
 UA = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) "
       "Chrome/128.0.0.0 Safari/537.36")
 

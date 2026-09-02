@@ -37,6 +37,14 @@ import os
 import sys
 from pathlib import Path
 
+# Windows consoles default to a legacy code page - cp1252 on an en-US install -
+# and this script writes with ensure_ascii=False. An address line carrying any
+# character outside that page would otherwise abort the run with
+# UnicodeEncodeError. No-op where the encoding is already UTF-8.
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+
 try:
     import yaml
 except ImportError:
