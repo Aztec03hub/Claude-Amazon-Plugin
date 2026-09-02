@@ -49,11 +49,14 @@ Usage:
 """
 
 import argparse
+import atexit
 import html
 import json
+import os
 import re
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 UA = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -76,14 +79,77 @@ SPEC_FIELDS = re.compile(
     r"Material|Brand|Manufacturer|Colour|Color|Size|Style|Capacity)", re.I)
 
 
-def fetch(url):
-    r = subprocess.run(
-        ["curl", "-s", "--compressed", "--max-time", "45", "-A", UA,
-         "-H", "Accept-Language: en-US,en;q=0.9",
-         "-H", "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-         url],
-        capture_output=True, text=True, errors="replace")
+# Set by --zip. When present every request carries the same cookie jar, which
+# is what makes a delivery location stick across the handshake and the fetches
+# that follow it.
+COOKIE_JAR = None
+
+
+def _curl(args):
+    base = ["curl", "-s", "--compressed", "--max-time", "45", "-A", UA,
+            "-H", "Accept-Language: en-US,en;q=0.9"]
+    if COOKIE_JAR:
+        base += ["-b", COOKIE_JAR, "-c", COOKIE_JAR]
+    r = subprocess.run(base + args, capture_output=True, text=True,
+                       errors="replace")
     return r.stdout
+
+
+def fetch(url):
+    return _curl(
+        ["-H", "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+         url])
+
+
+def set_delivery_zip(postcode):
+    """Run Amazon's own delivery-address handshake so every later fetch renders
+    for `postcode` rather than for whatever this host's IP implies.
+
+    This is the difference between a usable result and a confidently wrong one.
+    A request from a datacenter, a VPN exit or a colleague's machine reports
+    that location's prices, Prime badges, stock and delivery dates, and nothing
+    on the page says so - the output is still perfectly well-formed. --expect-zip
+    can only detect that after the fact; this fixes it.
+
+    Returns the address Amazon confirms. Raises rather than returning quietly:
+    unlocalised data presented as localised is worse than no data.
+    """
+    global COOKIE_JAR
+    fd, path = tempfile.mkstemp(prefix="amzn-cookies-", suffix=".txt")
+    os.close(fd)
+    atexit.register(lambda: os.path.exists(path) and os.unlink(path))
+    COOKIE_JAR = path
+
+    # Seed the session, then read the glow modal for a CSRF token. The token is
+    # not always rendered and the endpoint currently accepts the POST without
+    # one, so treat a miss as non-fatal and send it only when present.
+    _curl(["-o", os.devnull, "https://%s/" % DOMAIN])
+    glow = _curl(["https://%s/gp/glow/get-address-selections.html"
+                  "?deviceType=desktop&pageType=Gateway"
+                  "&storeContext=NoStoreName&actionSource=desktop-modal" % DOMAIN])
+    token = re.search(r'CSRF_TOKEN\s*:\s*"([^"]+)"', glow)
+
+    args = ["-X", "POST", "-H",
+            "Content-Type: application/x-www-form-urlencoded;charset=UTF-8"]
+    if token:
+        args += ["-H", "anti-csrftoken-a2z: " + token.group(1)]
+    for k, v in (("locationType", "LOCATION_INPUT"), ("zipCode", postcode),
+                 ("storeContext", "generic"), ("deviceType", "web"),
+                 ("pageType", "Gateway"), ("actionSource", "glow")):
+        args += ["--data-urlencode", "%s=%s" % (k, v)]
+    args.append("https://%s/portal-migration/hz/glow/address-change" % DOMAIN)
+
+    body = _curl(args)
+    try:
+        r = json.loads(body)
+    except ValueError:
+        raise RuntimeError(
+            "address-change did not return JSON (%d bytes) - the endpoint may "
+            "have moved again" % len(body))
+    if not (r.get("successful") and r.get("isAddressUpdated")):
+        raise RuntimeError("Amazon rejected postcode %r on %s: %s"
+                           % (postcode, DOMAIN, body[:200]))
+    return r.get("address", {})
 
 
 def text(s):
@@ -408,10 +474,31 @@ def main():
                    choices=sorted(MARKETPLACES["marketplaces"]),
                    help="which Amazon storefront (default: %(default)s)")
     p.add_argument("--rh", help="Amazon filter nodes, e.g. p_85:2470955011")
+    p.add_argument("--zip", "--postcode", dest="zip",
+                   help="render every page for this delivery postcode instead "
+                        "of whatever this host's IP implies. Required whenever "
+                        "the script runs somewhere other than where the user "
+                        "actually is: a datacenter, a VPN, a remote sandbox. "
+                        "Implies --expect-zip unless that is set explicitly.")
     a = p.parse_args()
 
     global DOMAIN
     DOMAIN = MARKETPLACES["marketplaces"][a.marketplace]["domain"]
+
+    applied = None
+    if a.zip:
+        try:
+            applied = set_delivery_zip(a.zip)
+        except RuntimeError as exc:
+            sys.exit(json.dumps({
+                "error": str(exc),
+                "requested_zip": a.zip,
+                "note": "Refusing to continue. Results would silently be for "
+                        "this host's location rather than the one requested.",
+            }, indent=2))
+        # Asking for a location and verifying it landed are the same intent.
+        if not a.expect_zip:
+            a.expect_zip = a.zip
 
     if a.mode == "listing":
         if not a.args:
@@ -423,6 +510,19 @@ def main():
         out = search(" ".join(a.args), a.rh)
     else:
         out = probe(a.marketplace, a.args[0] if a.args else None)
+
+    if applied is not None:
+        out = {
+            "delivery_location": {
+                "requested": a.zip,
+                "zip": applied.get("zipCode"),
+                "city": applied.get("city"),
+                "state": applied.get("state"),
+                "country": applied.get("countryCode"),
+                "applied": True,
+            },
+            "results": out,
+        }
 
     print(json.dumps(out, indent=2, ensure_ascii=False))
 
