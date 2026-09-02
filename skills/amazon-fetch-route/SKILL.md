@@ -62,7 +62,7 @@ Always read `ship_to` before quoting `delivery`. When the user's ZIP is known,
 pass it and let the script do the check:
 
 ```bash
-python3 "${CLAUDE_PLUGIN_ROOT}/scripts/amazon_fetch.py" listing B0XXXXXXXX --expect-zip 02139
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/amazon_fetch.py" listing B0XXXXXXXX --zip 02139
 ```
 
 A `ship_to_warning` in the output means the date is unusable. Say so rather than

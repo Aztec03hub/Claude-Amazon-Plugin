@@ -9,8 +9,20 @@ allowed-tools: Bash(python3 *), Bash(*/amazon_fetch.py *), Read, WebSearch
 Turn an ASIN or an Amazon URL into verified facts.
 
 ```bash
-python3 "${CLAUDE_PLUGIN_ROOT}/scripts/amazon_fetch.py" listing B0XXXXXXX1 B0XXXXXXX2 --expect-zip 02139
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/amazon_fetch.py" listing B0XXXXXXX1 B0XXXXXXX2 --zip 02139
 ```
+
+**Pass `--zip` on every call.** Amazon derives the delivery address from the
+requesting IP, so a fetch that does not set one is rendered for wherever the
+process happens to run. On a laptop at home that is right by accident; in a
+cloud sandbox, a VPN or CI it is silently wrong, and the output looks identical
+either way. Measured on one ASIN: no flag gave a delivery date two days later
+than the same ASIN with the user's own postcode set.
+
+`--zip` implies `--expect-zip`, so the location is both applied and verified.
+Get the postcode from `user_config.py resolve`, or from the user. If you truly
+have none, say which location the result came back for rather than presenting
+it as theirs.
 
 Pass every ASIN in one call — the script fetches them in sequence and returns
 one JSON array, and a single call keeps the shortlist together.
