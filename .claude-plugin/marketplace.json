@@ -1,0 +1,17 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "lafayette-forks",
+  "description": "Personal fork marketplace. Tracks upstream plugins with local patches applied, so updates are a deliberate merge rather than a silent fast-forward.",
+  "owner": {
+    "name": "Phil LaFayette"
+  },
+  "plugins": [
+    {
+      "name": "amazon",
+      "description": "Amazon marketplace research across regional storefronts: verified price, stock, rating, seller and specs read from the listing rather than the search grid, delivery dates checked against the postcode they were rendered for. Fork of danielrosehill/Claude-Amazon-Plugin with Windows portability fixes applied.",
+      "category": "productivity",
+      "source": ".",
+      "homepage": "https://github.com/Aztec03hub/Claude-Amazon-Plugin"
+    }
+  ]
+}
