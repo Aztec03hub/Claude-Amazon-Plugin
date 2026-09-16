@@ -202,6 +202,41 @@ Also note that an ASIN is ten characters of `[A-Z0-9]` and **not necessarily
 `B0`-prefixed** — books keep their ISBN-10, including trailing-`X` forms. A
 validator that insists on `B0` rejects valid input.
 
+## The deciding spec is often only inside the product images
+
+Amazon listings routinely put the specification that settles a question in the
+**image carousel**, not in the title, bullets or detail table. A text fetch
+cannot see it, and answering "the listing does not say" is then simply wrong.
+
+Observed: a car mount's vent-blade requirement - "fits vent blades with a
+minimum 6.5mm gap and 2.5-4mm thickness, not compatible with vents that have
+uneven shapes or deep curves" - existed **only** as text rendered into the first
+product photo. The fetched HTML did not say how the product mounted at all.
+
+So for any physical-fit, dimensional or compatibility-chart question where the
+text comes up empty: do not conclude the spec is unpublished. Say the text does
+not carry it, that the images likely do, and either ask the user to look or open
+the listing in a browser. Compatibility matrices are very often images.
+
+## Customer reviews hold measurements the listing never will, and resist fetching
+
+For "does it actually work with X", a single verified review frequently beats
+every marketing bullet on the page. Two obstacles:
+
+- Embedded reviews in the fetched `/dp/` HTML are sparse and often absent
+  entirely; a regex over `data-hook="review-body"` commonly returns nothing.
+- `https://www.amazon.com/product-reviews/<ASIN>/?filterByKeyword=<term>`
+  returns **zero bytes** to an anonymous fetch. It requires a signed-in browser
+  session.
+
+With a browser available, that keyword-filtered URL is the highest-value page on
+the whole site for compatibility questions. Without one, say that reviews were
+not reachable rather than implying none exist.
+
+Manufacturer sites are the useful fallback: their own product pages carry
+reviews an anonymous fetch can read, and sometimes state exclusions Amazon's
+listing omits entirely.
+
 ## What no route can tell you
 
 - **Price history.** No free programmatic source. Keepa is the working paid one.

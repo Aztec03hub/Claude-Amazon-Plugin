@@ -12,6 +12,31 @@ Turn an ASIN or an Amazon URL into verified facts.
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/amazon_fetch.py" listing B0XXXXXXX1 B0XXXXXXX2 --zip 02139
 ```
 
+## Always read `variants.check_pack_size`
+
+`listing` returns a `variants` block whenever the ASIN is one cell of a
+variation matrix, which most Amazon products are. When siblings differ only in
+a quantity dimension it adds `check_pack_size`.
+
+**Treat that warning as blocking.** Resolve it before quoting a price or a
+quantity:
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/amazon_fetch.py" variants <ASIN> --pick "Style=5 Pack"
+```
+
+then `listing` the ASIN it returns. Changing an option on Amazon is navigation
+between ASINs, not configuration of one, so there is nothing to click.
+
+This is not a nicety. Measured on a real cable listing: four singles at $17.42
+came to $69.68 where the five-pack of the same cable was $47.60, and neither
+page mentions the other. Recommending "buy 4 of these" without checking is the
+most expensive mistake available here.
+
+Note the quantity dimension is detected from its **values**, not its label.
+Amazon's dimension names are seller-chosen: on that cable listing the pack count
+lives under `Style` while `Size` means cable length.
+
 **Pass `--zip` on every call.** Amazon derives the delivery address from the
 requesting IP, so a fetch that does not set one is rendered for wherever the
 process happens to run. On a laptop at home that is right by accident; in a

@@ -97,6 +97,45 @@ Two attempts on one route, then change route. When you do run out, say
 specifically what you tried and how each failed, so the next attempt starts
 where you stopped.
 
+## Environment: Windows, WSL and Linux
+
+`amazon_fetch.py` needs Python 3 and `curl`, nothing else. It resolves `curl`
+once via `shutil.which` and exits with a clear JSON error naming the fix if it
+is absent, rather than raising a traceback.
+
+**Windows shells.** PowerShell's `>` redirect writes **UTF-16**, not UTF-8. A
+script that writes JSON to a file and parses it back must open it with
+`encoding='utf-16'`, or read stdout directly. Piping JSON through a
+`python -c` one-liner inside PowerShell hits quoting failures quickly; write a
+`.py` file and run it instead.
+
+**Windows `python3`.** On many Windows installs `python3` on PATH is the
+Microsoft Store alias stub, which prints "Python was not found" and exits 9009.
+Real Python is usually `python`. Every skill here invokes `python3`; if that
+resolves to the stub, either disable the App Execution Alias or place a
+`python3.exe` copy in the real Python directory ahead of `WindowsApps` on PATH.
+
+**The script itself is encoding-safe.** It reconfigures stdout and stderr to
+UTF-8 on startup, so a legacy console code page (cp1252, cp437) will not abort a
+run at the final print. Ad hoc inspection scripts you write are not covered -
+set `PYTHONIOENCODING=utf-8` for those.
+
+**curl builds differ, and it matters.** Linux and WSL curl is typically built
+with brotli and zstd; Windows' bundled `curl.exe` is not. `--compressed`
+advertises whatever the local build supports, and at least one Amazon endpoint
+answers in an encoding that decodes to unusable bytes on the richer build. The
+address-change POST behind `--zip` therefore runs with compression disabled;
+page fetches keep it, because those responses are megabytes.
+
+**WSL networking is the Windows host's.** A fetch from WSL egresses through the
+same connection, so the geolocated delivery address matches. Pass `--zip`
+anyway - it costs nothing and removes the assumption.
+
+**Opening URLs from WSL.** `webbrowser` sees `sys.platform == "linux"` and looks
+for a Linux desktop browser that usually is not there. `scripts/open_url.py`
+detects WSL and routes through `wslview` (from `wslu`) or `explorer.exe` so the
+URL reaches the user's real browser on the Windows side.
+
 ## Related
 
 - [reference/fetch-routes.md](../../reference/fetch-routes.md) — full routing detail, batch technique

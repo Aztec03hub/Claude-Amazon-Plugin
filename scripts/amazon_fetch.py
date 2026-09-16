@@ -55,6 +55,7 @@ import html
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -95,14 +96,40 @@ SPEC_FIELDS = re.compile(
 COOKIE_JAR = None
 
 
-def _curl(args):
-    base = ["curl", "-s", "--compressed", "--max-time", "45", "-A", UA,
+def _curl(args, compressed=True):
+    # curl is the one external dependency. It ships with Windows 10+ (as
+    # curl.exe in System32) and with most Linux distributions, but minimal WSL
+    # images and slim containers often omit it. Without this check the failure
+    # is a bare FileNotFoundError traceback, which reads like a bug in this
+    # script rather than a missing package.
+    if _curl.exe is None:
+        _curl.exe = shutil.which("curl") or shutil.which("curl.exe")
+        if _curl.exe is None:
+            sys.exit(json.dumps({
+                "error": "curl not found on PATH",
+                "platform": sys.platform,
+                "fix": ("Debian/Ubuntu/WSL: sudo apt install curl. "
+                        "Windows: curl.exe ships in C:\\Windows\\System32 "
+                        "on Windows 10 1803 and later. "
+                        "macOS: curl is preinstalled."),
+            }, indent=2))
+
+    base = [_curl.exe, "-s", "--max-time", "45", "-A", UA,
             "-H", "Accept-Language: en-US,en;q=0.9"]
+    if compressed:
+        base.append("--compressed")
     if COOKIE_JAR:
         base += ["-b", COOKIE_JAR, "-c", COOKIE_JAR]
-    r = subprocess.run(base + args, capture_output=True, text=True,
-                       errors="replace")
+    try:
+        r = subprocess.run(base + args, capture_output=True, text=True,
+                           errors="replace")
+    except OSError as exc:
+        sys.exit(json.dumps({"error": "could not run curl: %s" % exc,
+                             "curl": _curl.exe}, indent=2))
     return r.stdout
+
+
+_curl.exe = None          # resolved once, on first use
 
 
 def fetch(url):
@@ -149,7 +176,14 @@ def set_delivery_zip(postcode):
         args += ["--data-urlencode", "%s=%s" % (k, v)]
     args.append("https://%s/portal-migration/hz/glow/address-change" % DOMAIN)
 
-    body = _curl(args)
+    # compressed=False is load-bearing, not tidiness. curl builds differ by
+    # platform: the Linux/WSL build advertises brotli and zstd via --compressed,
+    # and this endpoint answers in an encoding that decodes to ~25 unusable
+    # bytes there, while Windows' slimmer curl.exe advertises only gzip/deflate
+    # and gets clean JSON. The symptom is --zip failing on Linux and WSL while
+    # working on Windows. The response is a few hundred bytes; compression buys
+    # nothing here anyway.
+    body = _curl(args, compressed=False)
     try:
         r = json.loads(body)
     except ValueError:

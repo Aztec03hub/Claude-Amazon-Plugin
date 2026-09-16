@@ -1,216 +1,150 @@
-# amazon
+# Amazon plugin (Lafayette fork)
 
-Claude Code plugin for **Amazon marketplace research**, across Amazon's regional
-storefronts.
+Marketplace research that reads the listing rather than the search grid, for a
+delivery postcode you choose rather than one your network implies.
 
-Amazon is the case where "the fetch returned something" and "the fetch worked"
-come apart. The default fetch tool cannot reach it at all, its bot wall answers
-with HTTP 200, and every delivery date it renders is for whichever ZIP the
-requesting IP resolved to — with nothing on the page to say which. Each of those
-failures produces a confident, well-formatted, wrong answer.
+Fork of [danielrosehill/Claude-Amazon-Plugin](https://github.com/danielrosehill/Claude-Amazon-Plugin)
+with cross-platform fixes and three additions: a delivery-location override,
+variation-matrix resolution, and list read/write.
 
-This plugin encodes the routing and the verification discipline that survive
-those, so an Amazon question gets an answer you can act on.
+---
 
-## Scope
+## Why this exists
 
-This is the **Amazon** plugin: all of Amazon's regional storefronts, not just
-amazon.com. The machinery is region-neutral and the volatile knowledge is data —
-`profiles/amazon-marketplaces.json` for domain, currency and postcode format,
-`profiles/<marketplace>.json` for the search grammar. Only `amazon-us` has a
-verified search grammar today; the rest are a derivation away, not a rewrite
-away. See [reference/marketplaces.md](reference/marketplaces.md).
+`WebFetch` cannot reach amazon.com. `/dp/` returns HTTP 500 and `/s?k=` returns
+503, consistently rather than transiently, and the bot wall returns **HTTP 200
+with a captcha body** - so a status code is not a success test. This plugin
+shells out to `curl` with browser headers and checks page size instead.
 
-Nothing personal ships in the repo. Delivery addresses and per-marketplace
-preferences live in a user directory outside it, shared with `procurement-tools`
-rather than forked — see [Configuration](#configuration).
+## Requirements
 
-It is deliberately narrow, and complements rather than replaces:
+Python 3 and `curl`. That is the whole dependency list. `curl` is resolved once
+via `shutil.which`; if it is missing you get a JSON error naming the install
+command for your platform, not a traceback.
 
-- [`procurement-tools`](https://github.com/danielrosehill/procurement-tools-plugin) —
-  the generalist ecommerce research plugin: intake, specs, cross-vendor
-  comparison, recommendations, preference memory.
-- [`shopping`](https://github.com/danielrosehill/Claude-Shopping-Plugin) —
-  region-specific consumer retail.
-
-Use `procurement-tools` for the buying workflow. Use this when the question is
-specifically *what does Amazon say*.
-
-## Commands
-
-| Command | Does |
-| --- | --- |
-| `/amazon:amazon-find <need>` | Category-first research: establish what actually solves the problem, search, verify, recommend one with a trade-off |
-| `/amazon:amazon-check <ASIN\|URL>...` | Verified price, stock, rating, seller and specs, read off the listing |
-| `/amazon:amazon-delivery <ASIN>...` | Same-day/overnight availability, the Prime basket minimum, cutoffs, coupons and Prime-exclusive pricing from your signed-in browser |
-
-## Skills
-
-Anonymous, cheap, stateless — start here:
-
-- **`amazon-fetch-route`** — pick the route, prove it worked. Read before the
-  first fetch of a session.
-- **`amazon-shortlist`** — need → category → search → verified candidates.
-- **`amazon-listing-check`** — price, stock, rating, seller, specs for named ASINs.
-- **`amazon-marketplace-config`** — which storefront, currency, postcode and
-  egress country an answer should be built from, resolved from the stored
-  delivery address. Read before anything that quotes a price or a date.
-- **`amazon-open-asin`** — open an ASIN in your own browser as a clean `/dp/` URL
-  on the right storefront, tracking stripped. Hands the page over; reads nothing.
-
-Signed-in browser, for facts that only a session renders:
-
-- **`amazon-delivery-check`** — overnight availability, cut-offs, coupons, and
-  whether Prime is still in force on the delivery date.
-- **`amazon-search`** — filtered search with per-card real delivery, using the
-  facet grammar and tested extractors in `profiles/amazon-us.json`.
-- **`brand-scrub`** — harvests the brand facet into a durable allow/blocklist, so
-  the next search starts from a filtered field.
-- **`amazon-account-import`** — fills the address book, default ship-to and Prime
-  state into the user config from the session, so the interview covers only what
-  Amazon cannot answer.
-
-Account state — the order history and the address book:
-
-- **`amazon-order-history`** — when you bought it, what you paid, what is
-  arriving, and whether you have bought this ASIN before. Read-only.
-- **`amazon-address-book`** — read the address book, correct a street or
-  postcode, add a place, change the default ship-to. Every change is confirmed
-  against a diff and verified afterwards.
-- **`amazon-order-cancel`** — cancel an order or individual items in one, with
-  explicit confirmation before submitting and a check against the order itself
-  afterwards. The only skill here that changes a real order.
-
-`profiles/amazon-us.json` holds everything volatile — facet IDs, sort keys,
-selectors, trust rubric, session-dependence notes. When Amazon changes, that is
-the file that gets edited. See [`profiles/README.md`](profiles/README.md).
-
-## Configuration
-
-The plugin ships **no address, no ZIP, no account state**. It reads them from a
-user directory, found by search rather than by a hardcoded path:
-
-| Order | Location |
-| --- | --- |
-| 1 | `$AMAZON_PLUGIN_CONFIG` |
-| 2 | `<user-data-root>/marketplaces/` |
-| 3 | `<user-data-root>/procurement-tools/` |
-
-`addresses.yaml` and `marketplaces.yaml` are already owned by
-[`procurement-tools`](https://github.com/danielrosehill/procurement-tools-plugin),
-and a delivery address is not Amazon-specific knowledge, so this plugin adopts
-that store instead of forking it. It never migrates one silently — two copies of
-an address is how a delivery date gets quoted for last year's flat.
-
-```bash
-python3 scripts/user_config.py path              # where the store is
-python3 scripts/user_config.py show              # what is in it, redacted
-python3 scripts/user_config.py resolve storrs    # storefront, currency, postcode, egress
-```
-
-Filling it, two halves:
-
-- **`/procurement-tools:shop-setup`** interviews the user for what no account
-  knows — deadlines, luggage limits, tax rates, where the driver actually goes.
-- **`amazon-account-import`** reads what the account does know straight out of a
-  signed-in session: the address book, the default ship-to, Prime state.
+Works on Windows, WSL, Linux and macOS. See
+[skills/amazon-fetch-route](skills/amazon-fetch-route/SKILL.md) for the
+platform-specific gotchas, which are real and have bitten.
 
 ## The script
 
-`scripts/amazon_fetch.py` fetches Amazon from the local machine and prints JSON.
-`-m/--marketplace` picks the storefront on every mode.
-
 ```bash
 python3 scripts/amazon_fetch.py probe
-python3 scripts/amazon_fetch.py listing B0CHHB4RHV B0XXXXXXXX --expect-postcode 02139
-python3 scripts/amazon_fetch.py search "usb c power bank" --rh p_85:2470955011
-python3 scripts/amazon_fetch.py probe -m amazon-uk B0XXXXXXXX
+python3 scripts/amazon_fetch.py listing  B0AAA B0BBB --zip 60137
+python3 scripts/amazon_fetch.py search   "folding luggage cart" --zip 60137 --rh p_85:2470955011
+python3 scripts/amazon_fetch.py variants B0AAA --pick "Style=5 Pack"
 ```
 
-No dependencies beyond `curl` and Python 3.
+`listing` takes several ASINs in one call. Batch them.
 
-`probe` answers the three questions that matter before trusting anything: is the
-route working, is it being walled, and which postcode will delivery dates be for.
+### `--zip` - set the delivery location
 
-Note that `amazon-us` throughout this repo is a **storefront** id, not the plugin
-id. The plugin is `amazon`; `amazon-us` is one of the twenty storefronts it
-speaks to, and `profiles/amazon-us.json` is that storefront's search grammar.
+**Pass it on every call.** Amazon derives the delivery address from the
+requesting IP, so every price, Prime badge, stock figure and delivery date is
+rendered for wherever the request originates. On a laptop at home that is right
+by accident. From a datacenter, a VPN, CI or an agent sandbox it is silently
+wrong, and the output looks identical either way.
 
-## What it knows that is not obvious
+Measured, same ASIN, same minute, from a cloud host in South Carolina:
 
-- **`WebFetch` cannot reach amazon.com.** HTTP 500 on `/dp/`, 503 on `/s?k=`.
-  Consistently, not transiently. Don't spend a call rediscovering it.
-- **The bot wall returns HTTP 200 with a captcha body.** Status codes are not
-  the success test. Check the body: a real page is 400–500 KB.
-- **Delivery dates belong to a ZIP.** Fetching from the user's own machine gives
-  the user's own area; a cloud fetcher or a VPN exit in another city gives an
-  equally confident date for somewhere else. `--expect-zip` turns that from a
-  silent wrong answer into a warning.
-- **Never recover the ZIP by regexing for five digits.** Amazon's asset
-  filenames collide with real ZIPs — `01890+Vwk8L.css` reads as Winchester MA on
-  every product page.
-- **Delivery is two priced options, not one date.** The fast one usually carries
-  a basket minimum. `#deliveryBlockMessage` returns only the first; the Prime
-  date is normally the second, and it is present anonymously.
-- **`Item Dimensions` may be folded or unfolded**, in the same field, with
-  nothing to distinguish them — and a large height is often handle height.
-- **Delivery filters are sticky across browser searches** and mutually
-  exclusive with each other. A sweep run under a stuck filter silently drops
-  every slower-shipping product.
-- **Navigating a signed-in session can land somewhere you did not ask for.**
-  Prefer read-only same-origin fetches, which cannot wander.
-- **An ASIN is only meaningful with its storefront.** The same ten characters can
-  be a live listing on `amazon.co.uk`, a different product on `amazon.com`, and
-  nothing on `amazon.de`. Rewriting the domain is a guess, and it returns HTTP
-  200 either way.
-- **The currency is a property of the route, not the listing.** `amazon.com`
-  renders ILS from an Israeli IP and USD from a US one, same URL, same ASIN.
+| | ship-to | delivery |
+| --- | --- | --- |
+| no flag | North Charleston 29415 | Wednesday, 9 September |
+| `--zip 60137` | Glen Ellyn 60137 | Monday, 7 September |
 
-- **Order history does not survive a fetch.** The page ships ten empty
-  `.order-card` shells and fills them client-side, so a fetch returns HTTP 200,
-  950 KB and zero orders. The address book, which looks identical from outside,
-  fetches fine. One of these two pages needs a rendered tab and the other does
-  not.
-- **An address field ID appears once per responsive layout**, so a book of six
-  addresses carries twelve nodes with the same id. `querySelector` returns the
-  first — someone else's flat, with no error.
-- **A cancelled order loses its structure.** Ship-to, payment, totals and the
-  shipment box all disappear, so the status selector returns empty rather than
-  `Cancelled`, and a missing total on an order card is data rather than a
-  parse failure.
+Same price, two days apart on delivery, nothing on the page saying which you
+got. `--zip` implies `--expect-zip`, so the location is applied *and* verified.
+If Amazon rejects the postcode the script exits rather than returning
+host-location data dressed as the requested one.
 
-Full detail in [`reference/`](reference):
-[fetch-routes](reference/fetch-routes.md) ·
-[delivery](reference/delivery.md) ·
-[marketplaces](reference/marketplaces.md) ·
-[search-filters](reference/search-filters.md) ·
-[verification-traps](reference/verification-traps.md) ·
-[account-pages](reference/account-pages.md)
+### `variants` - options are separate ASINs
 
-## Privacy and safety
+Every combination of colour, size and pack count is its own ASIN, and Amazon
+ships the whole matrix inside the product page. `listing` surfaces it:
 
-- Ships **no address, no account, no credentials**. Where a ZIP matters the
-  skills ask for one rather than assuming, and report the ZIP a page actually
-  resolved to alongside any date.
-- `amazon_fetch.py` is anonymous and stateless — no cookies, no session.
-- The research browser skills are read-only. They do not add to cart, place
-  orders, or click controls. If a navigation lands on an unexpected page they
-  open a fresh tab instead of interacting.
-- **Two skills write to the account, and only those two.**
-  `amazon-address-book` changes a delivery address; `amazon-order-cancel`
-  cancels an order or items in one. Both state exactly what is about to change,
-  wait for the user's explicit yes on that specific change, and verify the
-  outcome against the account afterwards rather than trusting a success banner.
-  Neither removes an address, and nothing here places an order or touches a
-  payment method.
+- `variants.this` - this ASIN's own option values
+- `variants.also_available` - siblings differing in exactly one dimension
+- `variants.check_pack_size` - **present when a quantity option exists**
 
-## Install
+Treat `check_pack_size` as blocking. Measured on a real cable listing: four
+singles at $17.42 came to $69.68 where the five-pack was $47.60, and neither
+page mentions the other.
+
+The quantity dimension is detected from its **values**, not its label. Amazon's
+dimension names are seller-chosen: on that listing the pack count was under
+`Style` while `Size` meant cable length.
+
+### Output shape
+
+JSON on stdout. With `--zip` it is
+`{"delivery_location": {...}, "results": [...]}`; without, just the results.
+
+## Skills
+
+| Skill | Route | Does |
+| --- | --- | --- |
+| `amazon-fetch-route` | script | Which route to use, and proving it worked |
+| `amazon-listing-check` | script | Verified price, stock, seller, specs for ASINs |
+| `amazon-shortlist` | script | Need to a shortlist, category-first |
+| `amazon-marketplace-config` | script | Which storefront and postcode to use |
+| `amazon-search` | browser | Signed-in search grid with real delivery dates |
+| `amazon-delivery-check` | browser | Same-day, cutoffs, Prime-exclusive pricing |
+| `amazon-order-history` | browser | What was bought, when, for how much |
+| `amazon-order-cancel` | browser | Cancel an order, with confirmation and verification |
+| `amazon-address-book` | browser | Read and edit delivery addresses |
+| `amazon-account-import` | browser | Pull addresses and Prime state into config |
+| `amazon-lists` | browser | Read lists, priced against current listings |
+| `amazon-list-add` | browser | Add a resolved ASIN to a named list |
+| `amazon-open-asin` | script | Open listings in the user's own browser |
+| `brand-scrub` | browser | Build trusted/blocked brand lists |
+
+**Script route** is anonymous and stateless - no cookies, no session. It cannot
+see anything behind the login, and it is immune to the sticky-filter problem
+that affects browsing.
+
+**Browser route** drives Claude in Chrome against the user's signed-in session.
+Needed for anything account-specific.
+
+## Lists
+
+`amazon-lists` is read-only. `amazon-list-add` writes, and **posts to the
+endpoint rather than driving the Add to List button**:
 
 ```
-/plugin marketplace add danielrosehill/Claude-Code-Plugins
-/plugin install amazon
+POST /hz/wishlist/additemtolist    listExternalId=<LISTID>&asin=<ASIN>&...
+header: anti-csrftoken-a2z   (from #lists-sp-csrf-form-token)
 ```
 
-## License
+`listExternalId` is required and explicit, so it cannot reach the default list.
+The button approach can and did - the split button's two halves sit ~13px apart,
+one adds to the default list with no prompt, and both live in the same form as
+add-to-cart and buy-now. Amazon reflows detail pages as images resolve, so a
+coordinate measured a moment earlier lands elsewhere.
 
-MIT.
+Verification re-reads the list. The inline confirmation is worthless:
+`#atwl-inline-sucess-msg` and `#atwl-inline-error-msg` are both pre-rendered and
+both always carry text.
+
+## Things that will catch you
+
+Read [reference/verification-traps.md](reference/verification-traps.md). The
+short version:
+
+- HTTP 200 can be a captcha wall. Check bytes, not status.
+- Grid prices are positional; open the listing.
+- The first price on the page is often the List Price.
+- **The deciding spec is frequently only inside the product images**, which a
+  text fetch cannot read. "The listing does not say" is often wrong.
+- Reviews hold the only real measurements, and the keyword-filtered reviews URL
+  returns zero bytes without a session.
+
+## Local changes vs upstream
+
+- UTF-8 stdout/stderr, so legacy Windows code pages do not abort a completed run
+- `scripts/open_url.py` replacing `xdg-open`, WSL-aware
+- `--zip` delivery-location override
+- `variants` mode and `check_pack_size`
+- `amazon-lists` and `amazon-list-add`
+- `curl` resolved and validated rather than assumed
+- Compression disabled on the address-change POST, which decodes to garbage on
+  brotli/zstd-enabled curl builds
